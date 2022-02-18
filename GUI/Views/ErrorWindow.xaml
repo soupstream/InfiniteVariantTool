@@ -1,0 +1,55 @@
+﻿<adonisControls:AdonisWindow x:Class="InfiniteVariantTool.GUI.ErrorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:InfiniteVariantTool.GUI"
+        xmlns:adonisUi="clr-namespace:AdonisUI;assembly=AdonisUI"
+        xmlns:adonisControls="clr-namespace:AdonisUI.Controls;assembly=AdonisUI"
+        mc:Ignorable="d"
+        d:Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}"
+        WindowStartupLocation="CenterOwner"
+        Closed="Window_Closed"
+        Title="Error" SizeToContent="Height" Width="800">
+    <Grid Margin="{adonisUi:Space 1}">
+        <DockPanel>
+            <StackPanel
+                Margin="{adonisUi:Space 0,1,0,0}"
+                Orientation="Horizontal"
+                DockPanel.Dock="Bottom">
+                <Button
+                    Margin="{adonisUi:Space 0,0,1,0}"
+                    x:Name="dismiss_button"
+                    Content="Dismiss"
+                    Click="DismissWindow"/>
+                <Button
+                    Margin="{adonisUi:Space 0,0,1,0}"
+                    x:Name="exit_button"
+                    Content="Exit"
+                    Click="ExitApplication"/>
+                <Button
+                    Margin="{adonisUi:Space 0,0,1,0}"
+                    Content="Copy"
+                    Click="CopyMessage"/>
+            </StackPanel>
+            <GroupBox DockPanel.Dock="Top">
+                <DockPanel>
+                    <Label Margin="{adonisUi:Space 0,0,0,1}" DockPanel.Dock="Top">
+                        The application encountered an error.
+                    </Label>
+                    <TextBlock Margin="{adonisUi:Space 0,0,0,1}" x:Name="info_text" DockPanel.Dock="Top">
+                        You may continue to use the application, but you might have to restart it if it becomes buggy.
+                    </TextBlock>
+                    <TextBox
+                        x:Name="text_box"
+                        TextWrapping="Wrap"
+                        IsReadOnly="True"
+                        VerticalContentAlignment="Top"
+                        HorizontalContentAlignment="Left"
+                        VerticalScrollBarVisibility="Auto"
+                        DockPanel.Dock="Bottom"/>
+                </DockPanel>
+            </GroupBox>
+        </DockPanel>
+    </Grid>
+</adonisControls:AdonisWindow>

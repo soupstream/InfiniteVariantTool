@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "InfiniteVariantTool.CLI": {
+      "commandName": "Project",
+      "commandLineArgs": "variants list Map"
+    }
+  }
+}

@@ -1,0 +1,61 @@
+﻿<adonisControls:AdonisWindow x:Class="InfiniteVariantTool.GUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:InfiniteVariantTool.GUI"
+        xmlns:adonisUi="clr-namespace:AdonisUI;assembly=AdonisUI"
+        xmlns:adonisControls="clr-namespace:AdonisUI.Controls;assembly=AdonisUI"
+        mc:Ignorable="d"
+        d:Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}"
+        d:DataContext="{d:DesignInstance Type=local:MainViewModel, IsDesignTimeCreatable=False}"
+        Loaded="OnWindowLoaded"
+        Title="Infinite Variant Tool"
+        WindowStartupLocation="CenterScreen"
+        Height="600"
+        Width="1000">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="File">
+                <MenuItem Header="Install variant..." Command="{Binding VariantViewModel.UserVariantsContext.InstallVariantCommand}"/>
+                <MenuItem Header="Reload variant list" Command="{Binding VariantViewModel.LoadVariantsCommand}"/>
+                <Separator />
+                <MenuItem Header="Settings..." Command="{Binding OpenSettingsWindowCommand}"/>
+            </MenuItem>
+            <MenuItem Header="View">
+                <MenuItem Header="Map variants" IsCheckable="True" IsChecked="{Binding VariantViewModel.ShowMapVariants}"/>
+                <MenuItem Header="UGC game variants" IsCheckable="True" IsChecked="{Binding VariantViewModel.ShowUgcGameVariants}"/>
+                <MenuItem Header="Engine game variants" IsCheckable="True" IsChecked="{Binding VariantViewModel.ShowEngineGameVariants}"/>
+                <MenuItem Header="Enabled variants" IsCheckable="True" IsChecked="{Binding VariantViewModel.ShowEnabledVariants}"/>
+                <MenuItem Header="Disabled variants" IsCheckable="True" IsChecked="{Binding VariantViewModel.ShowDisabledVariants}"/>
+            </MenuItem>
+            <MenuItem Header="Tools">
+                <MenuItem Header="Unpack cache file..." Command="{Binding OpenUnpackCacheFileWindowCommand}"/>
+                <MenuItem Header="Pack cache file..." Command="{Binding OpenPackCacheFileWindowCommand}"/>
+                <Separator />
+                <MenuItem Header="Unpack Lua bundle..." Command="{Binding OpenUnpackLuaBundleWindowCommand}"/>
+                <MenuItem Header="Pack Lua bundle..." Command="{Binding OpenPackLuaBundleWindowCommand}"/>
+                <Separator />
+                <MenuItem Header="Hash URL..." Command="{Binding OpenHashUrlWindowCommand}"/>
+            </MenuItem>
+            <MenuItem Header="Help">
+                <MenuItem Header="Check for updates" Command="{Binding ManualCheckForUpdateCommand}"/>
+                <MenuItem Header="About Infinite Variant Tool" Command="{Binding OpenAboutWindowCommand}"/>
+            </MenuItem>
+        </Menu>
+        <TabControl
+            x:Name="TabControl"
+            SelectedIndex="1"
+            Margin="{adonisUi:Space 0,1,0,0}" DockPanel.Dock="Bottom"
+            DataContext="{Binding VariantViewModel}">
+            <TabItem Header="My Variants">
+                <local:VariantListView
+                    DataContext="{Binding UserVariantsContext}"/>
+            </TabItem>
+            <TabItem Header="All Variants">
+                <local:VariantListView
+                    DataContext="{Binding AllVariantsContext}"/>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</adonisControls:AdonisWindow>

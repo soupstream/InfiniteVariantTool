@@ -1,0 +1,60 @@
+﻿<adonisControls:AdonisWindow x:Class="InfiniteVariantTool.GUI.FileActionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:InfiniteVariantTool.GUI"
+        xmlns:adonisUi="clr-namespace:AdonisUI;assembly=AdonisUI"
+        xmlns:adonisControls="clr-namespace:AdonisUI.Controls;assembly=AdonisUI"
+        xmlns:adonisExtensions="clr-namespace:AdonisUI.Extensions;assembly=AdonisUI"
+        mc:Ignorable="d"
+        d:Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}"
+        d:DataContext="{d:DesignInstance Type=local:FileActionViewModel, IsDesignTimeCreatable=False}"
+        WindowStartupLocation="CenterOwner"
+        Width="500"
+        SizeToContent="Height"
+        Title="{Binding Title}">
+    <Grid Margin="{adonisUi:Space 1}">
+        <DockPanel>
+            <StackPanel Orientation="Horizontal" Margin="{adonisUi:Space 0,1,0,0}" DockPanel.Dock="Bottom">
+                <Button
+                    Content="{Binding ActionLabel}"
+                    Command="{Binding ExecuteActionCommand}"
+                    d:Content="Unpack"
+                    Margin="{adonisUi:Space 0,0,1,0}"/>
+                <Button
+                    Command="{Binding CloseCommand}"
+                    Content="Close"/>
+            </StackPanel>
+            <GroupBox DockPanel.Dock="Top">
+                <StackPanel>
+                    <Label Content="Input file"/>
+                    <DockPanel Margin="{adonisUi:Space 0,1,0,0}">
+                        <Button
+                            DockPanel.Dock="Right"
+                            Content=" ... "
+                            Margin="{adonisUi:Space 1,0,0,0}"
+                            Command="{Binding PickInputPathCommand}"/>
+                        <TextBox
+                            DockPanel.Dock="Left"
+                            Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}"/>
+                    </DockPanel>
+                    <Label
+                        Content="Output file"
+                        Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <DockPanel Margin="{adonisUi:Space 0,1,0,0}">
+                        <Button
+                            DockPanel.Dock="Right"
+                            Content=" ... "
+                            Margin="{adonisUi:Space 1,0,0,0}"
+                            Command="{Binding PickOutputPathCommand}"/>
+                        <TextBox
+                            DockPanel.Dock="Left"
+                            adonisExtensions:WatermarkExtension.Watermark="{Binding DefaultOutputPath}"
+                            Text="{Binding OutputPath}"/>
+                    </DockPanel>
+                </StackPanel>
+            </GroupBox>
+        </DockPanel>
+    </Grid>
+</adonisControls:AdonisWindow>

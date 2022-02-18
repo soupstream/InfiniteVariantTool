@@ -1,0 +1,50 @@
+﻿<adonisControls:AdonisWindow x:Class="InfiniteVariantTool.GUI.HashUrlWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:InfiniteVariantTool.GUI"
+        xmlns:adonisUi="clr-namespace:AdonisUI;assembly=AdonisUI"
+        xmlns:adonisControls="clr-namespace:AdonisUI.Controls;assembly=AdonisUI"
+        mc:Ignorable="d"
+        d:Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}"
+        WindowStartupLocation="CenterOwner"
+        Title="Hash URL" SizeToContent="Height" Width="400">
+    <Window.DataContext>
+        <local:HashUrlViewModel/>
+    </Window.DataContext>
+    
+    <Grid Margin="{adonisUi:Space 1}">
+        <DockPanel>
+            <Button
+                DockPanel.Dock="Bottom"
+                Margin="{adonisUi:Space 0,1,0,0}"
+                Content="Close"
+                Command="{Binding CloseCommand}"
+                HorizontalAlignment="Left"/>
+            <GroupBox DockPanel.Dock="Top">
+                <StackPanel>
+                    <Label Content="URL"/>
+                    <TextBox
+                        Text="{Binding Path=Url, UpdateSourceTrigger=PropertyChanged}"
+                        Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <Label Content="Hash (Offline)" Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <TextBox
+                        Text="{Binding OfflineHash}"
+                        IsReadOnly="True"
+                        Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <Label Content="Hash (Online)" Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <TextBox
+                        Text="{Binding OnlineHash}"
+                        IsReadOnly="True"
+                        Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <Label Content="Hash (LAN)" Margin="{adonisUi:Space 0,1,0,0}"/>
+                    <TextBox
+                        Text="{Binding LanHash}"
+                        IsReadOnly="True"
+                        Margin="{adonisUi:Space 0,1,0,0}"/>
+                </StackPanel>
+            </GroupBox>
+        </DockPanel>
+    </Grid>
+</adonisControls:AdonisWindow>

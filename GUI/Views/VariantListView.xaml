@@ -1,0 +1,224 @@
+﻿<UserControl x:Class="InfiniteVariantTool.GUI.VariantListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:InfiniteVariantTool.GUI"
+             xmlns:adonisUi="clr-namespace:AdonisUI;assembly=AdonisUI"
+             xmlns:adonisExtensions="clr-namespace:AdonisUI.Extensions;assembly=AdonisUI"
+             xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=local:VariantViewModelContext, IsDesignTimeCreatable=False}"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <local:BooleanToLoadingVariantsConverter x:Key="BooleanToLoadingVariantsConverter" />
+    </UserControl.Resources>
+    
+    <Grid>
+        <DockPanel>
+            <TextBox
+                adonisExtensions:WatermarkExtension.Watermark="Search"
+                Text="{Binding Path=Parent.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                Margin="{adonisUi:Space 0,0,0,1}"
+                DockPanel.Dock="Top"/>
+            <GroupBox
+                DockPanel.Dock="Bottom"
+                Margin="{adonisUi:Space 0,1,0,0}"
+                x:Name="VariantEditor"
+                Visibility="{Binding AreVariantsSelectedOrChangesQueued, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <Grid IsSharedSizeScope="True" Margin="{adonisUi:Space 0,0,0,1}" Visibility="{Binding AreVariantsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+                            <Grid Visibility="{Binding CanEnableSelectedVariants, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Content="Enabled"/>
+                                <CheckBox
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    d:IsChecked="True"
+                                    IsChecked="{Binding SelectedVariantsEnabled}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding SelectedVariant, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Content="Type"/>
+                                <TextBox
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    IsReadOnly="True"
+                                    d:Text="EngineGameVariant"
+                                    Text="{Binding SelectedVariant.Type, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding SelectedVariant, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Content="Name"/>
+                                <TextBox
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    d:Text="Variant name"
+                                    Text="{Binding SelectedVariant.Name, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding SelectedVariant, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Margin="{adonisUi:Space 0,0,1,0}"
+                                    Content="Description"/>
+                                <TextBox
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Margin="{adonisUi:Space 0,0.5,0,0.5}"
+                                    d:Text="Variant description"
+                                    Text="{Binding SelectedVariant.Description, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding SelectedVariant, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Content="Asset ID"/>
+                                <TextBox
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    d:Text="973c443a-ccb8-40ac-aae2-d933087dd9f1"
+                                    Text="{Binding SelectedVariant.AssetId, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding SelectedVariant, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Content="Version ID"/>
+                                <TextBox
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    d:Text="717e501c-b4b8-4196-8723-a77f075e4d9e"
+                                    Text="{Binding SelectedVariant.VersionId, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding IsUserVariantSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition SharedSizeGroup="FirstRow"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="FirstColumn"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Label
+                                    VerticalAlignment="Center"
+                                    Content="Location"/>
+                                <DockPanel Grid.Column="1">
+                                    <Button
+                                        Content="Explorer"
+                                        Margin="{adonisUi:Space 1,0,0,0}"
+                                        Command="{Binding OpenInExplorerCommand}"
+                                        DockPanel.Dock="Right"
+                                        VerticalAlignment="Center"/>
+                                    <TextBox
+                                        VerticalAlignment="Center"
+                                        d:Text="C:\file\path"
+                                        IsReadOnly="True"
+                                        Text="{Binding SelectedVariant.Filename}"/>
+                                </DockPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel
+                        Orientation="Horizontal">
+                        <Button Content="Apply changes" Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding ApplyChangesCommand}" Visibility="{Binding AreChangesQueued, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Button Content="Discard changes" Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding DiscardChangesCommand}" Visibility="{Binding AreChangesQueued, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Button Content="Delete" Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding DeleteVariantsCommand}" Visibility="{Binding AreVariantsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Button Content="Clear selection" Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding ClearSelectionCommand}" Visibility="{Binding AreVariantsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Button Content="Extract..." Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding ExtractVariantCommand}" Visibility="{Binding IsNonUserVariantSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Button Content="Reinstall" Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding ReinstallVariantsCommand}" Visibility="{Binding AreUserVariantsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Button Content="Engine game variant" Margin="{adonisUi:Space 0,0,1,0}" Command="{Binding EngineGameVariantCommand}" Visibility="{Binding IsUgcGameVariantSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+            <ListView
+                ItemsSource="{Binding FilteredVariants}"
+                DockPanel.Dock="Top"
+                x:Name="VariantList"
+                PreviewMouseLeftButtonDown="VariantList_PreviewMouseLeftButtonDown"
+                PreviewMouseLeftButtonUp="VariantList_PreviewMouseLeftButtonUp"
+                PreviewMouseMove="VariantList_PreviewMouseMove">
+                <i:Interaction.Behaviors>
+                    <local:MultiSelectionBehavior SelectedItems="{Binding SelectedVariants}"/>
+                    <local:ScrollToSelectedItemBehaviour/>
+                </i:Interaction.Behaviors>
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Enabled" Width="50" adonisExtensions:GridViewSortExtension.PropertyName="Enabled">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox
+                                        IsChecked="{Binding Enabled}"
+                                        Visibility="{Binding Enabled, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Type" Width="125" DisplayMemberBinding="{Binding Type}" />
+                        <GridViewColumn Header="Name" Width="150" DisplayMemberBinding="{Binding Name}" />
+                        <GridViewColumn Header="Description" Width="200" DisplayMemberBinding="{Binding Description}" />
+                        <GridViewColumn Header="Asset ID" Width="200" DisplayMemberBinding="{Binding AssetId}" />
+                        <GridViewColumn Header="Version ID" Width="200" DisplayMemberBinding="{Binding VersionId}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+            <StackPanel>
+                <Button
+                    Content="{Binding Path=Parent.Loading, Converter={StaticResource BooleanToLoadingVariantsConverter}}"
+                    Command="{Binding Parent.LoadVariantsCommand}"
+                    HorizontalAlignment="Center"
+                    Margin="{adonisUi:Space 0,1,0,0}"
+                    Visibility="{Binding Path=Loaded, Converter={StaticResource NotBooleanToVisibilityConverter}}"
+                    d:Content="Load variants">
+                </Button>
+                <TextBlock
+                    Text="{Binding Path=ErrorMessage}"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    Margin="{adonisUi:Space 0,1,0,0}"
+                    Visibility="{Binding Path=ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</UserControl>
