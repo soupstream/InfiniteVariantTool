@@ -72,6 +72,12 @@ namespace InfiniteVariantTool.Core.Variants
         // AssetStats
         public long PlaysRecent { get; set; }
         public long PlaysAllTime { get; set; }
+        public long Favorites { get; set; }
+        public long Likes { get; set; }
+        public long Bookmarks { get; set; }
+        public long ParentAssetCount { get; set; }
+        public double AverageRating { get; set; }
+        public long NumberOfRatings { get; set; }
 
         public int InspectionResult { get; set; }
         public int CloneBehavior { get; set; }
@@ -140,6 +146,12 @@ namespace InfiniteVariantTool.Core.Variants
             AssetHome = other.AssetHome;
             PlaysRecent = other.PlaysRecent;
             PlaysAllTime = other.PlaysAllTime;
+            Favorites = other.Favorites;
+            Likes = other.Likes;
+            Bookmarks = other.Bookmarks;
+            ParentAssetCount = other.ParentAssetCount;
+            AverageRating = other.AverageRating;
+            NumberOfRatings = other.NumberOfRatings;
             InspectionResult = other.InspectionResult;
             CloneBehavior = other.CloneBehavior;
             IsBaseStruct = other.IsBaseStruct;
@@ -188,6 +200,14 @@ namespace InfiniteVariantTool.Core.Variants
                 {
                     PlaysRecent = d.ReadInt64(0);
                     PlaysAllTime = d.ReadInt64(1);
+                    Favorites = d.ReadInt64(2);
+                    Likes = d.ReadInt64(9);
+                    ParentAssetCount = d.ReadInt64(20);
+                    d.ReadList(21, BondType.@double, () =>
+                    {
+                        AverageRating = d.ReadDouble();
+                    });
+                    NumberOfRatings = d.ReadInt64(22);
                 });
                 InspectionResult = d.ReadInt32(8);
                 CloneBehavior = d.ReadInt32(9);
@@ -237,6 +257,14 @@ namespace InfiniteVariantTool.Core.Variants
                 {
                     s.WriteInt64(PlaysRecent, 0);
                     s.WriteInt64(PlaysAllTime, 1);
+                    s.WriteInt64(Favorites, 2);
+                    s.WriteInt64(Likes, 9);
+                    s.WriteInt64(ParentAssetCount, 20);
+                    s.WriteList(BondType.@double, 21, () =>
+                    {
+                        s.WriteDouble(AverageRating);
+                    });
+                    s.WriteInt64(NumberOfRatings, 22);
                 });
                 s.WriteInt32(InspectionResult, 8);
                 s.WriteInt32(CloneBehavior, 9);
