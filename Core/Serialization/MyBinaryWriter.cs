@@ -180,9 +180,27 @@ namespace InfiniteVariantTool.Core.Serialization
             data.AddRange(System.Text.Encoding.UTF8.GetBytes(value));
         }
 
+        public void WriteStringBuffer(string value, int size)
+        {
+            WriteString(value);
+            if (size > value.Length)
+            {
+                data.AddRange(new byte[size - value.Length]);
+            }
+        }
+
         public void WriteWString(string value)
         {
             data.AddRange(System.Text.Encoding.Unicode.GetBytes(value));
+        }
+
+        public void WriteWStringBuffer(string value, int size)
+        {
+            WriteWString(value);
+            if (size > value.Length)
+            {
+                data.AddRange(new byte[size - value.Length]);
+            }
         }
 
         public void WriteBytes(IList<byte> value)

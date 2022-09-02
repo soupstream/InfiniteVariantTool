@@ -108,7 +108,7 @@ namespace InfiniteVariantTool.Core.Cache
                         }
                         else
                         {
-                            data = result.Blobs.First().Value;
+                            data = result.Blobs.First().Item2;
                         }
                     }
                     else
@@ -182,18 +182,11 @@ namespace InfiniteVariantTool.Core.Cache
                 if (Content is CacheFileContentBytes bytesContent)
                 {
                     List<CacheFileContentBytes> contentBlobs = new();
-                    contentBlobs.Add(new CacheFileContentBytes(bytesContent.Name, bytesContent.Type, bytesContent.Data, blobElement));
+                    contentBlobs.Add(new CacheFileContentBytes(bytesContent.Name, bytesContent.Type, bytesContent.Data));
                     return new CacheFileContentBond(bytesContent.Name, doc, contentBlobs);
                 }
                 else if (Content is CacheFileContentBond bondContent)
                 {
-                    // XML is copied during serialization which invalidates node references, so we need to find the blob nodes again
-                    List<XElement> blobElements = blobElement!.Descendants("blob").ToList();
-                    List<CacheFileContentBytes> blobList = new(bondContent.Blobs);
-                    for (int i = 0; i < blobElements.Count; i++)
-                    {
-                        blobList[i].BlobNode = blobElements[i];
-                    }
                     return new CacheFileContentBond(bondContent.Name, doc, bondContent.Blobs);
                 }
                 else
@@ -286,7 +279,6 @@ namespace InfiniteVariantTool.Core.Cache
     {
         string Name { get; set; }
         ContentType Type { get; }
-        XElement? BlobNode { get; }
         ContentType InferType();
         void SetName(string name, FileNameDeduper deduper);
         void Save();
@@ -307,12 +299,11 @@ namespace InfiniteVariantTool.Core.Cache
             Data = data;
         }
 
-        public CacheFileContentBytes(string name, ContentType type, byte[] data, XElement? blobNode)
+        public CacheFileContentBytes(string name, ContentType type, byte[] data)
         {
             Name = name;
             Type = type;
             Data = data;
-            BlobNode = blobNode;
         }
 
         public ContentType InferType()
@@ -329,7 +320,7 @@ namespace InfiniteVariantTool.Core.Cache
             {
                 Type = ContentType.Json;
             }
-            else if (LuaBundleUnpacker.IsLuaBundle(Data))
+            else if (LuaBundleUtils.IsLuaBundle(Data))
             {
                 Type = ContentType.Luabundle;
             }
@@ -360,7 +351,6 @@ namespace InfiniteVariantTool.Core.Cache
                     _ => throw new Exception()
                 });
             }
-            BlobNode?.SetText(Path.GetFileName(Name));
         }
 
         public void Save()
@@ -387,7 +377,7 @@ namespace InfiniteVariantTool.Core.Cache
             Type = ContentType.Bond;
             Name = "";
             Data = data.Doc;
-            Blobs = data.Blobs.Select(entry => new CacheFileContentBytes(entry.Key.GetText(), ContentType.Undefined, entry.Value, entry.Key)).ToList();
+            Blobs = data.Blobs.Select(entry => new CacheFileContentBytes(entry.Item1, ContentType.Undefined, entry.Item2)).ToList();
         }
 
         public CacheFileContentBond(string name, XElement data, List<CacheFileContentBytes> blobs)
@@ -437,9 +427,16 @@ namespace InfiniteVariantTool.Core.Cache
         public void SetName(string name, FileNameDeduper deduper)
         {
             Name = deduper.Dedupe(name);
-            foreach (var blob in Blobs)
+            foreach (XElement node in Data.Descendants("blob"))
             {
-                blob.SetName(name, deduper);
+                foreach (var blob in Blobs)
+                {
+                    if (node.GetText() == blob.Name)
+                    {
+                        blob.SetName(name, deduper);
+                        node.SetText(Path.GetFileName(blob.Name));
+                    }
+                }
             }
         }
 

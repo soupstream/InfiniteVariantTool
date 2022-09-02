@@ -115,6 +115,13 @@ namespace InfiniteVariantTool.Core.Serialization
             return ReadString(length);
         }
 
+        public string ReadStringBuffer(int size)
+        {
+            string ret = ReadCString(size);
+            cursor += size - ret.Length;
+            return ret;
+        }
+
         public string ReadWString(int length)
         {
             string ret = System.Text.Encoding.Unicode.GetString(data, cursor, length * 2);

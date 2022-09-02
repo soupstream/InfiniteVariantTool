@@ -14,4 +14,10 @@ namespace InfiniteVariantTool.Core
         public static readonly byte[] jpgSignature = new byte[] { 0xff, 0xd8, 0xff };
         public static readonly string AppName = "InfiniteVariantTool";
     }
+
+    public enum Game
+    {
+        HaloInfinite,
+        Halo5
+    }
 }

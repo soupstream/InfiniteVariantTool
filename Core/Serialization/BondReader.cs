@@ -67,7 +67,7 @@ namespace InfiniteVariantTool.Core.Serialization
         private Stack<MyBinaryReader> brStack = new();
         private bool littleEndian = true;
         private bool extractBlobs = true;
-        private OrderedDictionary<XElement, byte[]> blobs;
+        private List<(string, byte[])> blobs;
 
         public int BlobLengthThreshold { get; set; } = 100;
 
@@ -338,9 +338,11 @@ namespace InfiniteVariantTool.Core.Serialization
                 && count >= BlobLengthThreshold)
             {
                 byte[] blob = br.ReadBytes(count);
+                string tmpName = string.Format("blob_{0:D3}", blobs.Count);
+                blobs.Add((tmpName, blob));
                 node = new XElement(BondType.blob.ToString(),
                     new XAttribute(BondAttr.type.ToString(), type.ToString()));
-                blobs[node] = blob;
+                node.SetText(tmpName);
                 return node;
             }
 
@@ -417,9 +419,9 @@ namespace InfiniteVariantTool.Core.Serialization
     public class BondReadResult
     {
         public XElement Doc { get; }
-        public OrderedDictionary<XElement, byte[]> Blobs { get; }
+        public List<(string, byte[])> Blobs { get; }
 
-        public BondReadResult(XElement doc, OrderedDictionary<XElement, byte[]> blobs)
+        public BondReadResult(XElement doc, List<(string, byte[])> blobs)
         {
             Doc = doc;
             Blobs = blobs;
@@ -430,18 +432,25 @@ namespace InfiniteVariantTool.Core.Serialization
             SetFileName(filename);
             foreach (var blob in Blobs)
             {
-                File.WriteAllBytes(blob.Key.GetText(), blob.Value);
+                File.WriteAllBytes(blob.Item1, blob.Item2);
             }
             Doc.SaveVersioned(filename);
         }
 
         public void SetFileName(string filename)
         {
-            int i = 0;
-            foreach (var blob in Blobs)
+            foreach (XElement node in Doc.Descendants("blob"))
             {
-                string blobFilename = string.Format("{0}.blob_{1:D3}", filename, i++);
-                blob.Key.SetText(blobFilename);
+                for (int i = 0; i < Blobs.Count; i++)
+                {
+                    if (Blobs[i].Item1 == node.GetText())
+                    {
+                        string blobFilename = string.Format("{0}.blob_{1:D3}", filename, i);
+                        Blobs[i] = (blobFilename, Blobs[i].Item2);
+                        node.SetText(blobFilename);
+                        break;
+                    }
+                }
             }
         }
 
@@ -457,7 +466,9 @@ namespace InfiniteVariantTool.Core.Serialization
                     byte[] data = ListToBlob(node);
                     node.Elements().Remove();
                     node.Name = BondType.blob.ToString();
-                    Blobs[node] = data;
+                    string blobName = string.Format("blob_{0:D3}", Blobs.Count);
+                    node.SetText(blobName);
+                    Blobs.Add((blobName, data));
                     return true;
                 }
             }
@@ -478,14 +489,14 @@ namespace InfiniteVariantTool.Core.Serialization
         public static BondReadResult Load(string filename)
         {
             XElement doc = XElement.Load(filename);
-            OrderedDictionary<XElement, byte[]> blobs = new();
+            List<(string, byte[])> blobs = new();
             foreach (XElement node in doc.Descendants("blob"))
             {
                 string blobFilename = node.GetText();
                 if (blobFilename != "")
                 {
                     blobFilename = Path.Combine(Path.GetDirectoryName(filename)!, blobFilename);
-                    blobs[node] = File.ReadAllBytes(blobFilename);
+                    blobs.Add((blobFilename, File.ReadAllBytes(blobFilename)));
                 }
             }
             return new BondReadResult(doc, blobs);

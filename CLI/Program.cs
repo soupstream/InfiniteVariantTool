@@ -51,13 +51,15 @@ namespace InfiniteVariantTool.CLI
                 {
                     new Command("unpack", "Unpack a lua bundle")
                     {
+                        new Option<Game?>(new string[] { "--game", "-g" }, "Specify game (otherwise detect automatically)"),
                         new Argument<FileInfo>("filename", "Lua bundle file to unpack"),
                         new Option<DirectoryInfo?>(new string[] { "--output", "-o" }, "Output directory name")
                     }
                     .Also(cmd => cmd.SetHandler(
-                        (FileInfo infile, DirectoryInfo? outdir, InvocationContext ctx) => LuaBundleUnpackHandler(infile, outdir, ctx),
+                        (Game? game, FileInfo infile, DirectoryInfo? outdir, InvocationContext ctx) => LuaBundleUnpackHandler(game, infile, outdir, ctx),
+                        cmd.Options[0],
                         cmd.Arguments[0],
-                        cmd.Options[0])),
+                        cmd.Options[1])),
 
                     new Command("pack", "Pack a lua bundle")
                     {
@@ -239,19 +241,19 @@ namespace InfiniteVariantTool.CLI
             Console.WriteLine("Success: " + outfilename);
         }
 
-        static void LuaBundleUnpackHandler(FileInfo infile, DirectoryInfo? outdir, InvocationContext ctx)
+        static void LuaBundleUnpackHandler(Game? game, FileInfo infile, DirectoryInfo? outdir, InvocationContext ctx)
         {
-            LuaBundleUnpacker unpacker = new(infile.FullName);
-            string outfilename = outdir?.FullName ?? LuaBundleUnpacker.SuggestFilename(infile.FullName);
-            unpacker.Save(outfilename);
+            LuaBundle bundle = LuaBundle.Unpack(infile.FullName, game);
+            string outfilename = outdir?.FullName ?? LuaBundleUtils.SuggestUnpackFilename(infile.FullName);
+            bundle.Save(outfilename);
             Console.WriteLine("Success: " + outfilename);
         }
 
         static void LuaBundlePackHandler(DirectoryInfo indir, FileInfo? outfile, InvocationContext ctx)
         {
-            LuaBundlePacker packer = new(indir.FullName);
-            string outfilename = outfile?.FullName ?? LuaBundlePacker.SuggestFilename(indir.FullName);
-            packer.Save(outfilename);
+            LuaBundle bundle = LuaBundle.Load(indir.FullName);
+            string outfilename = outfile?.FullName ?? LuaBundleUtils.SuggestPackFilename(indir.FullName);
+            File.WriteAllBytes(outfilename, bundle.Pack());
             Console.WriteLine("Success: " + outfilename);
         }
 

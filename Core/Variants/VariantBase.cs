@@ -69,16 +69,16 @@ namespace InfiniteVariantTool.Core.Variants
                             {
                                 if (blob.Type == ContentType.Luabundle)
                                 {
-                                    LuaBundleUnpacker unpacker = new(blob.Data);
-                                    unpacker.Save(filePath + "_lua");
+                                    LuaBundle bundle = LuaBundle.Unpack(blob.Data, Game.HaloInfinite);
+                                    bundle.Save(filePath + "_lua");
                                 }
                             }
                         }
                     }
                     if (UnpackLuaBundles && filePath.EndsWith(".debugscriptsource"))
                     {
-                        LuaBundleUnpacker unpacker = new(entry.Value.Bytes);
-                        unpacker.Save(filePath[..^18] + "_debug_lua");
+                        LuaBundle bundle = LuaBundle.Unpack(entry.Value.Bytes, Game.HaloInfinite);
+                        bundle.Save(filePath[..^18] + "_debug_lua");
                     }
                 }
             }

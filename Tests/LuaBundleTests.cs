@@ -36,11 +36,8 @@ namespace InfiniteVariantTool.Tests
                 string outputDir = Path.Combine(Path.GetDirectoryName(outputFile)!, Path.GetFileNameWithoutExtension(outputFile));
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFile)!);
                 Console.WriteLine(filename);
-                LuaBundleUnpacker unpacker = new(data);
-                LuaBundle bundle = unpacker.Save(outputDir);
-
-                LuaBundlePacker packer = new(outputDir);
-                byte[] packed = packer.Save(outputFile);
+                LuaBundle bundle = LuaBundle.Unpack(data, Game.HaloInfinite);
+                byte[] packed = bundle.Pack();
 
                 Assert.IsTrue(data.SequenceEqual(packed));
             }

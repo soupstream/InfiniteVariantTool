@@ -59,13 +59,13 @@ namespace InfiniteVariantTool.GUI
 
         public override string FilenameFunc(string filename)
         {
-            return LuaBundleUnpacker.SuggestFilename(filename);
+            return LuaBundleUtils.SuggestUnpackFilename(filename);
         }
 
         public override void FileAction(string inputFilename, string outputFilename)
         {
-            LuaBundleUnpacker unpacker = new(inputFilename);
-            unpacker.Save(outputFilename);
+            LuaBundle bundle = LuaBundle.Load(inputFilename);
+            bundle.Save(outputFilename);
         }
     }
 
@@ -79,13 +79,14 @@ namespace InfiniteVariantTool.GUI
 
         public override string FilenameFunc(string filename)
         {
-            return LuaBundlePacker.SuggestFilename(filename);
+            return LuaBundleUtils.SuggestPackFilename(filename);
         }
 
         public override void FileAction(string inputFilename, string outputFilename)
         {
-            LuaBundlePacker packer = new(inputFilename);
-            packer.Save(outputFilename);
+            LuaBundle bundle = LuaBundle.Unpack(inputFilename, Game.HaloInfinite);
+            byte[] packed = bundle.Pack();
+            File.WriteAllBytes(outputFilename, packed);
         }
     }
 
