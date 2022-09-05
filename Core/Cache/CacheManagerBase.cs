@@ -30,6 +30,7 @@ namespace InfiniteVariantTool.Core.Cache
         public string BasePath { get; set; }
         public string? Language { get; set; }
         public string? BuildNumber { get; set; }
+        public bool Exists { get; set; }
 
         protected abstract string CacheMapPath { get; }
         protected abstract string GameManifestUrl { get; }
@@ -53,11 +54,13 @@ namespace InfiniteVariantTool.Core.Cache
             {
                 CacheMap = new CacheMap(CacheMapPath);
                 Language = CacheMap.Language;
+                Exists = true;
                 return true;
             }
             else
             {
                 CacheMap = new();
+                Exists = false;
                 return false;
             }
         }

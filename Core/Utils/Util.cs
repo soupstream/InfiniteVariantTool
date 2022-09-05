@@ -11,6 +11,7 @@ using InfiniteVariantTool.Core.Serialization;
 using InfiniteVariantTool.Core.Cache;
 using InfiniteVariantTool.Core.Settings;
 using System.Reflection;
+using System.Diagnostics;
 
 namespace InfiniteVariantTool.Core.Utils
 {
@@ -112,17 +113,9 @@ namespace InfiniteVariantTool.Core.Utils
 
         public static string GetBuildNumber()
         {
-            string filename = Path.Combine(UserSettings.Instance.GameDirectory, Constants.OfflineCacheDirectory, "en-US", "other", "CacheMap.wcache");
-            CacheMap cm = new(filename);
-            foreach (var entry in cm.Map)
-            {
-                Match match = Regex.Match(entry.Value.Metadata.Url!, "^https://discovery-infiniteugc-intone.test.svc.halowaypoint.com/hi/manifests/builds/([^/]*)/game$");
-                if (match.Success)
-                {
-                    return match.Groups[1].Value;
-                }
-            }
-            throw new Exception();
+            FileVersionInfo exeInfo = FileVersionInfo.GetVersionInfo(Path.Combine(UserSettings.Instance.GameDirectory, Constants.GameExeName));
+            string version = exeInfo.ProductVersion ?? throw new Exception("Game version not found");
+            return version[..^2];   // remove ".0" from end
         }
 
         public static string MakeValidFilename(string filename, char replacement = '_')

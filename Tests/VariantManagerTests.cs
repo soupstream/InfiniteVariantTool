@@ -58,11 +58,9 @@ namespace InfiniteVariantTool.Tests
                 }
             }
 
-            manager.OfflineCache!.BasePath = Path.Combine(outputDir, Constants.OfflineCacheDirectory);
             manager.OnlineCache!.BasePath = Path.Combine(outputDir, Constants.OnlineCacheDirectory);
             manager.LanCache!.BasePath = Path.Combine(outputDir, Constants.LanCacheDirectory);
             Directory.CreateDirectory(Path.Combine(outputDir, Constants.OfflineCacheDirectory, "common", "other"));
-            Directory.CreateDirectory(Path.Combine(outputDir, Constants.OfflineCacheDirectory, manager.OfflineCache.Language!, "other"));
             Directory.CreateDirectory(Path.Combine(outputDir, Constants.OnlineCacheDirectory, "webcache"));
             Directory.CreateDirectory(Path.Combine(outputDir, Constants.LanCacheDirectory, "webcache"));
 

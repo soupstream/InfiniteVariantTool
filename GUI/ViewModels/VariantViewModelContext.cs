@@ -896,27 +896,25 @@ namespace InfiniteVariantTool.GUI
 
         public override async Task<bool> LoadVariantsBase(VariantManager variantManager)
         {
-            string? language = await Task.Run(() => variantManager.LoadLanguage());
-            if (language == null)
+            await Task.Run(() => variantManager.LoadCache(() => UserSettings.Instance.Language));
+            if (variantManager.OnlineCache!.Language == "auto")
             {
-                if (UserSettings.Instance.Language != "auto")
-                {
-                    language = UserSettings.Instance.Language;
-                }
-                else
-                {
-                    ErrorMessage = "Could not detect Halo Infinite's cache language.\r\nRun the game while online (at least until the menu loads) or manually set your language in Settings and try again.";
-                    return false;
-                }
+                ErrorMessage = "Could not detect Halo Infinite's cache language.\r\nRun the game while online (at least until the menu loads) or manually set your language in Settings and try again.";
+                return false;
             }
-
-            await Task.Run(() => variantManager.LoadCache(language));
 
             Variants = new(variantManager.GetVariantEntries(null, null, null, null, null)
                 .Select(entry => new VariantModel(entry)));
             if (Variants.Count == 0)
             {
-                ErrorMessage = "No variants exist in Halo Infinite.\r\nSomething has probably gone terribly wrong.";
+                if (variantManager.OnlineCache.Exists)
+                {
+                    ErrorMessage = "Variant cache is empty.";
+                }
+                else
+                {
+                    ErrorMessage = "Variant cache does not exist.\r\nRun the game while online (at least until the menu loads) to generate it.";
+                }
             }
             return true;
         }

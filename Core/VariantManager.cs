@@ -1,4 +1,5 @@
 ﻿using InfiniteVariantTool.Core.Cache;
+using InfiniteVariantTool.Core.Utils;
 using InfiniteVariantTool.Core.Variants;
 using System;
 using System.Collections.Generic;
@@ -48,13 +49,14 @@ namespace InfiniteVariantTool.Core
                 info => info);
 
         private string gameDir;
+        // the offline cache is currently busted so remove support for now
         public OfflineCacheManager? OfflineCache { get; private set; }
         public OnlineCacheManager? OnlineCache { get; private set; }
         public LanCacheManager? LanCache { get; private set; }
         public UserCacheManager? UserCache { get; private set; }
 
-        [MemberNotNullWhen(true, nameof(OfflineCache), nameof(OnlineCache), nameof(LanCache))]
-        private bool CachesAreInitialized => OfflineCache != null && OnlineCache != null && LanCache != null;
+        [MemberNotNullWhen(true, nameof(OnlineCache), nameof(LanCache))]
+        private bool CachesAreInitialized => OnlineCache != null && LanCache != null;
 
         public VariantManager(string gameDir)
         {
@@ -65,96 +67,28 @@ namespace InfiniteVariantTool.Core
             }
         }
 
-        public string? LoadLanguage()
-        {
-            // try to infer language
-            string? language = null;
-            OnlineCache = new(Path.Combine(gameDir, Constants.OnlineCacheDirectory));
-            if (OnlineCache.LoadCacheMap())
-            {
-                language = OnlineCache.Language;
-            }
-            LanCache = new(Path.Combine(gameDir, Constants.LanCacheDirectory));
-            if (LanCache.LoadCacheMap())
-            {
-                language = LanCache.Language;
-            }
-
-            return language;
-        }
-
         public void LoadCache(Func<string> languagePicker)
         {
-            LoadCache(LoadLanguage() ?? languagePicker());
-        }
-
-        public void LoadCache(string language)
-        {
-            // Finish loading cache
-            OfflineCache = new(Path.Combine(gameDir, Constants.OfflineCacheDirectory), language);
-            OfflineCache.LoadCacheMap();
+            string buildNumber = Util.GetBuildNumber();
+            OfflineCache = new(Path.Combine(gameDir, Constants.OfflineCacheDirectory), "en-US");
+            OfflineCache.BuildNumber = buildNumber;
             OfflineCache.LoadGameManifest();
-            OfflineCache.LoadCustomsManifest();
 
-            if (OnlineCache == null)
-            {
-                OnlineCache = new(Path.Combine(gameDir, Constants.OnlineCacheDirectory));
-                OnlineCache.LoadCacheMap();
-            }
-            OnlineCache.Language = language;
-            OnlineCache.BuildNumber = OfflineCache.BuildNumber;
+            OnlineCache = new(Path.Combine(gameDir, Constants.OnlineCacheDirectory));
+            OnlineCache.LoadCacheMap();
+            OnlineCache.BuildNumber = buildNumber;
             OnlineCache.LoadGameManifest();
             OnlineCache.LoadCustomsManifest();
 
-            if (LanCache == null)
-            {
-                LanCache = new(Path.Combine(gameDir, Constants.LanCacheDirectory));
-                OnlineCache.LoadCacheMap();
-            }
-            LanCache.Language = language;
+            LanCache = new(Path.Combine(gameDir, Constants.LanCacheDirectory));
+            LanCache.LoadCacheMap();
+            LanCache.BuildNumber = buildNumber;
             LanCache.AssetId = OfflineCache.GameManifest!.Base.AssetId;
-            LanCache.VersionId = OfflineCache.GameManifest!.Base.VersionId;
-            LanCache.BuildNumber = OfflineCache.BuildNumber;
+            LanCache.VersionId = OfflineCache.GameManifest.Base.VersionId;
             LanCache.LoadGameManifest();
 
-            MergeManifests();
-        }
-
-        private void MergeManifests()
-        {
-            if (!CachesAreInitialized || OfflineCache.GameManifest == null || OfflineCache.CustomsManifest == null || OnlineCache.GameManifest == null || OnlineCache.CustomsManifest == null || OnlineCache.CacheMap == null)
-            {
-                throw new InvalidOperationException();
-            }
-
-            // if customs manifest has different version IDs than game manifest, switch to game manifest's version IDs
-            foreach (var entry in OfflineCache.CustomsManifest.GetVariants(null, null, null, null))
-            {
-                var matches = OfflineCache.GameManifest.GetVariants(entry.Metadata.AssetId, null, entry.Type, null);
-                if (!matches.Any(matchEntry => matchEntry.Metadata.VersionId == entry.Metadata.VersionId))
-                {
-                    foreach (var match in matches)
-                    {
-                        entry.Metadata.SetAssetId(match.Metadata.AssetId);
-                        entry.Metadata.SetVersionId(match.Metadata.VersionId);
-                    }
-                }
-            }
-
-            // if online customs manifest has any entries missing from offline customs manifest, add them
-            if (!OnlineCache.CustomsManifest.CompareContentsByGuid(OfflineCache.CustomsManifest))
-            {
-                foreach (var entry in OnlineCache.CustomsManifest.GetVariants(null, null, null, null))
-                {
-                    if (!OfflineCache.CustomsManifest.GetVariants(entry.Metadata.AssetId, null, entry.Type, null).Any())
-                    {
-                        foreach (var match in OfflineCache.GameManifest.GetVariants(entry.Metadata.AssetId, null, entry.Type, null))
-                        {
-                            OfflineCache.CustomsManifest.AddVariant(match);
-                        }
-                    }
-                }
-            }
+            OnlineCache.Language ??= LanCache.Language ?? languagePicker();
+            LanCache.Language ??= OnlineCache.Language;
         }
 
         public UserCacheManager LoadUserCache(string modDir)
@@ -171,7 +105,7 @@ namespace InfiniteVariantTool.Core
                 throw new InvalidOperationException();
             }
 
-            foreach (ICacheManager cache in new ICacheManager[] { OfflineCache, OnlineCache, LanCache })
+            foreach (ICacheManager cache in new ICacheManager[] { OnlineCache, LanCache })
             {
                 CacheFile? cacheFile = await cache.GetFile(url, contentType);
                 if (cacheFile != null)
@@ -190,14 +124,14 @@ namespace InfiniteVariantTool.Core
             }
 
             VariantDownloader downloader = new();
-            byte[] data = await downloader.DownloadFile(url, OfflineCache!.Language, contentType)
+            byte[] data = await downloader.DownloadFile(url, OnlineCache!.Language, contentType)
                 ?? throw new HttpRequestException("Received status " + downloader.StatusCode + " for: " + url);
             return new CacheFile(data, contentType, false);
         }
 
         public IEnumerable<UserVariantEntry> GetUserVariantEntries()
         {
-            if (UserCache == null || !CachesAreInitialized || OfflineCache.CustomsManifest == null)
+            if (UserCache == null || !CachesAreInitialized || OnlineCache.CustomsManifest == null)
             {
                 throw new InvalidOperationException();
             }
@@ -207,7 +141,7 @@ namespace InfiniteVariantTool.Core
                 bool? actualEnabled = null;
                 if (entry.Metadata.Type != VariantType.EngineGameVariant)
                 {
-                    actualEnabled = OfflineCache.CustomsManifest.GetVariants(entry.Metadata.Base.AssetId, entry.Metadata.Base.VersionId, null, null).Any();
+                    actualEnabled = OnlineCache.CustomsManifest.GetVariants(entry.Metadata.Base.AssetId, entry.Metadata.Base.VersionId, null, null).Any();
                 }
                 entry.Enabled = actualEnabled;
                 yield return entry;
@@ -225,12 +159,12 @@ namespace InfiniteVariantTool.Core
 
         public IEnumerable<VariantEntry> GetVariantEntries(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
         {
-            if (!CachesAreInitialized || OfflineCache.GameManifest == null || OfflineCache.CustomsManifest == null)
+            if (!CachesAreInitialized || OnlineCache.GameManifest == null || OnlineCache.CustomsManifest == null)
             {
                 throw new InvalidOperationException();
             }
 
-            foreach (VariantEntry entry in OfflineCache.GameManifest.GetVariants(assetId, versionId, variantType, name))
+            foreach (VariantEntry entry in OnlineCache.GameManifest.GetVariants(assetId, versionId, variantType, name))
             {
                 if (entry.Type == VariantType.EngineGameVariant)
                 {
@@ -241,7 +175,7 @@ namespace InfiniteVariantTool.Core
                 }
                 else
                 {
-                    bool actualEnabled = OfflineCache.CustomsManifest.GetVariants(entry.Metadata.AssetId, entry.Metadata.VersionId, null, null).Any();
+                    bool actualEnabled = OnlineCache.CustomsManifest.GetVariants(entry.Metadata.AssetId, entry.Metadata.VersionId, null, null).Any();
                     if (enabled == null || enabled == actualEnabled)
                     {
                         entry.Enabled = actualEnabled;
@@ -319,7 +253,7 @@ namespace InfiniteVariantTool.Core
                 ContentType contentType = ContentType.Bin;
                 if (path.StartsWith("CustomGamesUIMarkup"))
                 {
-                    string shortLanguageCode = LanguageCodeMap[OfflineCache.Language!].ShortCode;
+                    string shortLanguageCode = LanguageCodeMap[OnlineCache.Language!].ShortCode;
                     if (path.EndsWith($"_{shortLanguageCode}.bin"))
                     {
                         includeFile = true;
@@ -359,7 +293,7 @@ namespace InfiniteVariantTool.Core
 
         public void SaveVariant(Variant variant)
         {
-            if (!CachesAreInitialized || OfflineCache.GameManifest == null)
+            if (!CachesAreInitialized || OnlineCache.GameManifest == null)
             {
                 throw new InvalidOperationException();
             }
@@ -372,25 +306,25 @@ namespace InfiniteVariantTool.Core
                 var match = Regex.Match(entry.Key, @"_([a-z]{2,3})\.bin$");
                 if (match.Success)
                 {
-                    string languageCode = LanguageCodeMap[OfflineCache.Language!].ShortCode;
+                    string languageCode = LanguageCodeMap[OnlineCache.Language!].ShortCode;
                     path = path[..match.Groups[1].Index] + languageCode + ".bin";
                 }
 
                 string fileUrl = variant.Metadata.Base.Prefix + path;
-                OfflineCache.SaveFile(entry.Value, fileUrl);
+                OnlineCache.SaveFile(entry.Value, fileUrl);
             }
             var metadataCacheFile = new CacheFile(variant.Metadata.Serialize());
-            OfflineCache.SaveFile(metadataCacheFile, variant.Url);
+            OnlineCache.SaveFile(metadataCacheFile, variant.Url);
 
             VariantMetadataBase newEntry = new(variant.Metadata.Base);
             newEntry.IsBaseStruct = false;
             newEntry.FileRelativePaths.RemoveAll(path => !path.EndsWith(".png", StringComparison.InvariantCultureIgnoreCase));
-            OfflineCache.GameManifest.AddVariant(variant.Type, newEntry);
+            OnlineCache.GameManifest.AddVariant(variant.Type, newEntry);
         }
 
         public async Task RemoveVariant(Guid assetId, Guid versionId)
         {
-            if (!CachesAreInitialized || OfflineCache.GameManifest == null || OfflineCache.CustomsManifest == null)
+            if (!CachesAreInitialized || OnlineCache.GameManifest == null || OnlineCache.CustomsManifest == null)
             {
                 throw new InvalidOperationException();
             }
@@ -401,16 +335,16 @@ namespace InfiniteVariantTool.Core
                 foreach (string path in variant.Metadata.Base.FileRelativePaths)
                 {
                     string fileUrl = variant.Metadata.Base.Prefix + path;
-                    OfflineCache.RemoveFile(fileUrl);
+                    OnlineCache.RemoveFile(fileUrl);
                 }
-                OfflineCache.RemoveFile(variant.Url);
+                OnlineCache.RemoveFile(variant.Url);
                 variantsToRemove.Add((assetId, versionId));
             }
 
             foreach ((var assetId_, var versionId_) in variantsToRemove)
             {
-                OfflineCache.GameManifest.RemoveVariant(assetId_, versionId_, null, null);
-                OfflineCache.CustomsManifest.RemoveVariant(assetId_, versionId_, null, null);
+                OnlineCache.GameManifest.RemoveVariant(assetId_, versionId_, null, null);
+                OnlineCache.CustomsManifest.RemoveVariant(assetId_, versionId_, null, null);
             }
         }
 
@@ -423,7 +357,7 @@ namespace InfiniteVariantTool.Core
                 VariantType.EngineGameVariant => "engineGameVariants",
                 _ => throw new ArgumentException()
             };
-            return $"https://discovery-infiniteugc-intone.test.svc.halowaypoint.com/hi/{variantTypeString}/{assetId}/versions/{versionId}";
+            return $"https://discovery-infiniteugc.test.svc.halowaypoint.com/hi/{variantTypeString}/{assetId}/versions/{versionId}";
         }
 
         public async Task Save()
@@ -434,10 +368,10 @@ namespace InfiniteVariantTool.Core
             }
 
             //OfflineCache.EnableAllVariants();
-            OfflineCache.Save();
+            OnlineCache.Save();
 
-            OnlineCache.GameManifest = new(OfflineCache.GameManifest!);
-            OnlineCache.CustomsManifest = new(OfflineCache.CustomsManifest!);
+            OnlineCache.GameManifest = new(OnlineCache.GameManifest!);
+            OnlineCache.CustomsManifest = new(OnlineCache.CustomsManifest!);
 
             ConvertMetadataUrlsToOnline(OnlineCache.GameManifest.PlaylistLinks);
             ConvertMetadataUrlsToOnline(OnlineCache.GameManifest.EngineGameVariantLinks);
@@ -451,7 +385,7 @@ namespace InfiniteVariantTool.Core
 
             OnlineCache.Save();
             LanCache.EndpointsFile = await GetFile(LanCache.EndpointsFileUrl, ContentType.Bond);
-            LanCache.GameManifest = new(OfflineCache.GameManifest!);
+            LanCache.GameManifest = new(OnlineCache.GameManifest!);
             LanCache.Save();
         }
 
@@ -470,24 +404,24 @@ namespace InfiniteVariantTool.Core
 
         public void EnableVariant(Guid assetId, Guid versionId)
         {
-            if (!CachesAreInitialized || OfflineCache.CustomsManifest == null)
+            if (!CachesAreInitialized || OnlineCache.CustomsManifest == null)
             {
                 throw new InvalidOperationException();
             }
 
-            VariantEntry gameManifestEntry = OfflineCache.GameManifest?.GetVariants(assetId, versionId, null, null).FirstOrDefault()
+            VariantEntry gameManifestEntry = OnlineCache.GameManifest?.GetVariants(assetId, versionId, null, null).FirstOrDefault()
                 ?? throw new Exception("Variant does not exist");
-            OfflineCache.CustomsManifest.AddVariant(gameManifestEntry);
+            OnlineCache.CustomsManifest.AddVariant(gameManifestEntry);
         }
 
         public void DisableVariant(Guid assetId, Guid versionId)
         {
-            if (!CachesAreInitialized || OfflineCache.CustomsManifest == null)
+            if (!CachesAreInitialized || OnlineCache.CustomsManifest == null)
             {
                 throw new InvalidOperationException();
             }
 
-            OfflineCache.CustomsManifest.RemoveVariant(assetId, versionId, null, null);
+            OnlineCache.CustomsManifest.RemoveVariant(assetId, versionId, null, null);
         }
     }
 }
