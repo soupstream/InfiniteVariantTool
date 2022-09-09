@@ -15,6 +15,7 @@ using System.Xml.Serialization;
 
 namespace InfiniteVariantTool.Tests
 {
+    /*
     [TestClass]
     public class VariantTests
     {
@@ -107,4 +108,5 @@ namespace InfiniteVariantTool.Tests
             Assert.IsTrue(XNode.DeepEquals(doc, cacheFile.Doc));
         }
     }
+    */
 }

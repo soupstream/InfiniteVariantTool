@@ -9,6 +9,7 @@ using System.Text;
 using System.Reflection;
 using InfiniteVariantTool.Core.Settings;
 using InfiniteVariantTool.Core.Cache;
+using InfiniteVariantTool.Core.Serialization;
 
 namespace InfiniteVariantTool.Tests
 {
@@ -47,16 +48,13 @@ namespace InfiniteVariantTool.Tests
         {
             foreach ((string filename, byte[] data) in TestUtil.GatherCacheFiles(dir))
             {
-                CacheFile cacheFile = new(data, ContentType.AutoDetect, null);
-                cacheFile.Content.SetName(filename, new());
-                if (cacheFile.Content is CacheFileContentBond bondContent)
+                BondReader br = new(data);
+                var result = br.Read(true);
+                foreach (var blob in result.Blobs)
                 {
-                    foreach (CacheFileContentBytes blob in bondContent.Blobs)
+                    if (LuaBundleUtils.IsLuaBundle(blob.Value))
                     {
-                        if (blob.Type == ContentType.Luabundle)
-                        {
-                            yield return (blob.Name, blob.Data);
-                        }
+                        yield return (blob.Key, blob.Value);
                     }
                 }
             }

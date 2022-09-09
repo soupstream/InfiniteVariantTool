@@ -1,4 +1,5 @@
 ﻿using InfiniteVariantTool.Core;
+using InfiniteVariantTool.Core.BondSchema;
 using InfiniteVariantTool.Core.Cache;
 using InfiniteVariantTool.Core.Serialization;
 using InfiniteVariantTool.Core.Settings;
@@ -17,41 +18,6 @@ namespace InfiniteVariantTool.Tests
     [TestClass]
     public class CacheMapTests
     {
-        [TestMethod]
-        public void TestCustomCacheMap()
-        {
-            CacheMap cm = new()
-            {
-                Map = new()
-                {
-                    {
-                        998,
-                        new CacheMapEntry()
-                        {
-                            Metadata = new()
-                            {
-                                Guid = new()
-                            }
-                        }
-                    },
-                    {
-                        12345,
-                        new CacheMapEntry()
-                        {
-                            Metadata = new()
-                            {
-                                Url = "https://example.com"
-                            }
-                        }
-                    }
-                },
-                Language = "en-US"
-            };
-
-            XElement doc = cm.Serialize();
-            CacheMap cm2 = new();
-            cm2.Deserialize(doc);
-        }
 
         [TestMethod]
         public void TestOfflineCacheMaps()
@@ -82,12 +48,11 @@ namespace InfiniteVariantTool.Tests
                 Console.WriteLine(filename);
 
                 byte[] data = File.ReadAllBytes(filename);
-                BondReader br = new(data);
-                XElement doc = br.Save(outputFile + ".xml").Doc;
-                CacheMap cm = new(doc);
-                XElement doc2 = cm.Save(outputFile + ".repacked.xml");
+                CacheMap cm = SchemaSerializer.DeserializeBond<CacheMap>(data);
+                byte[] repacked = SchemaSerializer.SerializeBond(cm);
+                
 
-                Assert.IsTrue(XDocument.DeepEquals(doc, doc2));
+                Assert.IsTrue(data.SequenceEqual(repacked));
             }
         }
     }

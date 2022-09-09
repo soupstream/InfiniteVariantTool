@@ -11,54 +11,36 @@ namespace InfiniteVariantTool.Core.Cache
 {
     public class UserCacheManager
     {
-        public List<UserVariantEntry> entries { get; private set; }
+        public List<VariantAsset> Entries { get; private set; }
         private string cacheDirectory;
 
         public UserCacheManager(string cacheDirectory)
         {
             this.cacheDirectory = cacheDirectory;
-            entries = new();
+            Entries = new();
         }
 
-        public void LoadEntries()
+        public async Task LoadEntries()
         {
-            entries = GetEntries().ToList();
-        }
-
-        public IEnumerable<UserVariantEntry> GetEntries()
-        {
-            foreach (string filepath in Directory.GetFiles(cacheDirectory, "*.xml", SearchOption.AllDirectories))
+            Entries.Clear();
+            foreach (string filePath in Directory.GetFiles(cacheDirectory, "*", SearchOption.AllDirectories))
             {
-                if (VariantMetadata.TryLoadMetadata(filepath) is VariantMetadata metadata)
+                string fileName = Path.GetFileName(filePath);
+                if (VariantAsset.VariantFileNames.Contains(fileName))
                 {
-                    yield return new UserVariantEntry(filepath, metadata);
+                    Entries.Add(await VariantAsset.Load(filePath, false));
                 }
             }
         }
 
-        public Variant LoadVariant(UserVariantEntry entry)
+        public void RemoveVariant(string variantFilePath)
         {
-            return Variant.Load(entry.Path);
-        }
+            Entries.RemoveAll(entry => entry.FilePath == variantFilePath);
 
-        public void RemoveVariant(string variantFilename)
-        {
-            entries.RemoveAll(entry => entry.Path.StartsWith(variantFilename));
-
-            // remove variant metadata and files
-            if (File.Exists(variantFilename))
+            string variantDirectory = Path.GetDirectoryName(variantFilePath)!;
+            if (Directory.Exists(variantDirectory))
             {
-                File.Delete(variantFilename);
-            }
-            else
-            {
-                return;
-            }
-            string variantDirectory = Path.GetDirectoryName(variantFilename)!;
-            string filesDirectory = Path.Combine(variantDirectory, "files");
-            if (Directory.Exists(filesDirectory))
-            {
-                Directory.Delete(filesDirectory, true);
+                Directory.Delete(variantDirectory, true);
             }
 
             // remove empty parent directories
@@ -70,18 +52,6 @@ namespace InfiniteVariantTool.Core.Cache
                 Directory.Delete(currentPath);
                 currentPath = Path.GetDirectoryName(currentPath)!;
             }
-        }
-    }
-
-    public class UserVariantEntry
-    {
-        public string Path { get; set; }
-        public VariantMetadata Metadata { get; set; }
-        public bool? Enabled { get; set; }
-        public UserVariantEntry(string path, VariantMetadata metadata)
-        {
-            Path = path;
-            Metadata = metadata;
         }
     }
 }

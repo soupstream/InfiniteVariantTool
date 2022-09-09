@@ -13,6 +13,7 @@ using InfiniteVariantTool.Core.Variants;
 using InfiniteVariantTool.Core.Cache;
 using InfiniteVariantTool.Core.Serialization;
 using InfiniteVariantTool.Core.Utils;
+using InfiniteVariantTool.Core.BondSchema;
 
 namespace InfiniteVariantTool.CLI
 {
@@ -22,22 +23,24 @@ namespace InfiniteVariantTool.CLI
         {
             var rootCommand = new RootCommand()
             {
-                // cachefile
-                new Command("cache", "Pack/unpack a cache file")
+                // bond
+                new Command("bond", "Pack/unpack a bond file")
                 {
-                    new Command("unpack", "Unpack a cache file")
+                    new Command("unpack", "Unpack a bond file")
                     {
                         new Argument<FileInfo>("filename", "Cache file to unpack"),
-                        new Option<FileInfo?>(new string[] { "--output", "-o" }, "Output file name")
+                        new Option<FileInfo?>(new string[] { "--output", "-o" }, "Output file name"),
+                        new Option<bool?>(new string[] { "--embedded", "-e" }, "Unpack embedded bond content"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        (FileInfo infile, FileInfo? outfile, InvocationContext ctx) => CacheFileUnpackHandler(infile, outfile, ctx),
+                        (FileInfo infile, FileInfo? outfile, bool? unpackEmbedded, InvocationContext ctx) => CacheFileUnpackHandler(infile, outfile, unpackEmbedded, ctx),
                         cmd.Arguments[0],
-                        cmd.Options[0])),
+                        cmd.Options[0],
+                        cmd.Options[1])),
 
-                    new Command("pack", "Pack a cache file")
+                    new Command("pack", "Pack a bond file")
                     {
-                        new Argument<FileInfo>("filename", "Cache file to pack"),
+                        new Argument<FileInfo>("filename", "Bond file to pack"),
                         new Option<FileInfo?>(new string[] { "--output", "-o" }, "Output file name")
                     }
                     .Also(cmd => cmd.SetHandler(
@@ -75,11 +78,11 @@ namespace InfiniteVariantTool.CLI
                 // urlhash
                 new Command("hash", "Hash a content URL")
                 {
-                    new Argument<EndpointType>("endpoint-type", "Type of endpoint"),
+                    new Argument<ApiType>("api-type", "Type of API"),
                     new Argument<string>("url", "Content URL to hash")
                 }
                 .Also(cmd => cmd.SetHandler(
-                    (EndpointType endpointType, string url, InvocationContext ctx) => UrlHashHandler(url, endpointType, ctx),
+                    (ApiType apiType, string url, InvocationContext ctx) => UrlHashHandler(url, apiType, ctx),
                     cmd.Arguments[0],
                     cmd.Arguments[1])),
 
@@ -93,15 +96,17 @@ namespace InfiniteVariantTool.CLI
                         new Option<VariantType?>("--type", "Type of variant"),
                         new Option<string?>("--name", "Name of variant"),
                         new Option<bool?>("--enabled", "Whether the variant is enabled"),
+                        new Option<bool?>("--user", "Show only user-installed variants"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled) =>
-                            await VariantListHandler(assetId, versionId, variantType, name, enabled),
+                        async (Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled, bool? user) =>
+                            await VariantListHandler(assetId, versionId, variantType, name, enabled, user),
                         cmd.Options[0],
                         cmd.Options[1],
                         cmd.Options[2],
                         cmd.Options[3],
-                        cmd.Options[4])),
+                        cmd.Options[4],
+                        cmd.Options[5])),
                     new Command("extract", "Extract a variant")
                     {
                         new Option<Guid?>("--asset-id", "Asset ID of variant"),
@@ -126,13 +131,13 @@ namespace InfiniteVariantTool.CLI
                         cmd.Options[6],
                         cmd.Options[7],
                         cmd.Options[8])),
-                    new Command("save", "Save a variant")
+                    new Command("install", "Install a variant")
                     {
                         new Option<bool>("--enable", "Also add the variant to the Custom Games menu"),
                         new Argument<string>("variant-dir", "Variant directory name")
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (bool enable, string variantDir) => await VariantSaveHandler(enable, variantDir),
+                        async (bool enable, string variantDir) => await VariantInstallHandler(enable, variantDir),
                         cmd.Options[0],
                         cmd.Arguments[0])),
                     new Command("enable", "Add a variant to the Custom Games menu")
@@ -225,11 +230,16 @@ namespace InfiniteVariantTool.CLI
 
         ///// Handlers /////
 
-        static void CacheFileUnpackHandler(FileInfo infile, FileInfo? outfile, InvocationContext ctx)
+        static void CacheFileUnpackHandler(FileInfo infile, FileInfo? outfile, bool? unpackEmbedded, InvocationContext ctx)
         {
-            CacheFile cm = new(infile.FullName, ContentType.AutoDetect, null);
-            string outfilename = outfile?.FullName ?? CacheFile.SuggestFilename(infile.FullName, cm.Content.Type);
-            cm.Save(outfilename);
+            BondReader br = new(infile.FullName);
+            string outfilename = outfile?.FullName ?? (infile + FileExtension.Xml.Value);
+            var result = br.Read();
+            if (unpackEmbedded == true)
+            {
+                result.ReadEmbeddedBond();
+            }
+            result.Save(outfilename);
             Console.WriteLine("Success: " + outfilename);
         }
 
@@ -257,55 +267,59 @@ namespace InfiniteVariantTool.CLI
             Console.WriteLine("Success: " + outfilename);
         }
 
-        static void UrlHashHandler(string url, EndpointType endpointType, InvocationContext ctx)
+        static async void UrlHashHandler(string url, ApiType apiType, InvocationContext ctx)
         {
-            ulong? hash = UrlHasher.TryHashUrl(url, endpointType);
-            if (hash == null)
+            var caches = await CacheManager.LoadAllCaches(UserSettings.Instance.GameDirectory, LanguageNotDetectedPicker);
+            CacheManager cache = apiType switch
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.Error.WriteLine("Unable to hash URL");
-                Console.ResetColor();
-                ctx.ExitCode = 1;
+                ApiType.offline => caches.Offline,
+                ApiType.online => caches.Online,
+                ApiType.lan => caches.Lan,
+                _ => throw new ArgumentException()
+            };
+            var apiCall = cache.Api.CallUrl(url);
+            if (apiCall == null)
+            {
+                Console.Error.WriteLine("Invalid URL");
             }
             else
             {
-                Console.WriteLine(hash);
+                Console.WriteLine(apiCall.Hash);
             }
         }
 
-        static async Task VariantListHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
+        static async Task VariantListHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled, bool? user)
         {
-            VariantManager manager = new(UserSettings.Instance.GameDirectory);
-            manager.LoadCache(LanguageNotDetectedPicker);
-            await foreach (var variant in manager.GetVariants(assetId, versionId, variantType, name, enabled, false, false, false))
+            VariantManager manager = await VariantManager.Load(LanguageNotDetectedPicker);
+            VariantFilter filter = new()
             {
-                PrintMetadata(variant.Type, variant.Metadata.Base);
-                Console.WriteLine("Tags: [{0}]", string.Join(", ", variant.Metadata.Tags));
-                if (variant.Enabled != null)
-                {
-                    Console.WriteLine("Enabled: " + variant.Enabled);
-                }
-                if (variant is UgcGameVariant ugcGameVariantMetadata)
-                {
-                    var engineLink = ugcGameVariantMetadata.Metadata.EngineGameVariantLink;
-                    if (engineLink != null)
-                    {
-                        Console.WriteLine("Engine Game Variant:");
-                        Console.WriteLine("    AssetId: " + engineLink.AssetId);
-                        Console.WriteLine("    VersionId: " + engineLink.VersionId);
-                        Console.WriteLine("    Name: " + engineLink.PublicName);
-                        Console.WriteLine("    Description: " + engineLink.Description);
-                    }
-                }
+                AssetId = assetId,
+                VersionId = versionId,
+                Name = name,
+                Enabled = enabled,
+                Type = variantType
+            };
+
+            foreach (var variant in user == true ? manager.FilterUserVariants(filter) : manager.FilterVariants(filter))
+            {
+                PrintMetadata(variant);
             }
         }
 
         static async Task VariantExtractHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled,
             bool generateGuids, bool downloadLua, bool unpackLinked, string? outputDir, InvocationContext ctx)
         {
-            VariantManager manager = new(UserSettings.Instance.GameDirectory);
-            manager.LoadCache(LanguageNotDetectedPicker);
-            var entries = manager.GetVariantEntries(assetId, versionId, variantType, name, enabled);
+            VariantManager manager = await VariantManager.Load(LanguageNotDetectedPicker);
+            VariantFilter filter = new()
+            {
+                AssetId = assetId,
+                VersionId = versionId,
+                Name = name,
+                Enabled = enabled,
+                Type = variantType
+            };
+
+            var entries = manager.FilterVariants(filter);
             if (!entries.Any())
             {
                 Console.WriteLine("Error: no matching variants");
@@ -316,85 +330,99 @@ namespace InfiniteVariantTool.CLI
                 Console.WriteLine("Error: multiple matching variants:");
                 foreach (var item in entries)
                 {
-                    PrintMetadata(item.Type, item.Metadata);
+                    PrintMetadata(item);
                 }
                 ctx.ExitCode = 1;
             }
             else
             {
                 var entry = entries.First();
-                var variant = await manager.GetVariant(entry.Metadata.AssetId, entry.Metadata.VersionId, entry.Type, null, null, unpackLinked, true, true, downloadLua);
+                var variant = await manager.GetVariant((Guid)entry.Variant.AssetId, (Guid)entry.Variant.VersionId, entry.Type, unpackLinked);
                 if (generateGuids)
                 {
-                    variant.GenerateAssetId();
-                    variant.GenerateVersionId();
+                    variant.GenerateGuids();
                 }
                 if (outputDir == null)
                 {
-                    outputDir = Util.MakeValidFilename(variant.Metadata.Base.PublicName);
+                    outputDir = FileUtil.MakeValidFilename(variant.Variant.PublicName);
                 }
-                variant.Save(outputDir);
+                await variant.Save(outputDir);
                 Console.WriteLine("Success: " + outputDir);
             }
         }
 
-        static async Task VariantSaveHandler(bool enable, string variantDir)
+        static async Task VariantInstallHandler(bool enable, string variantFilePath)
         {
-            VariantManager manager = new(UserSettings.Instance.GameDirectory);
-            manager.LoadCache(LanguageNotDetectedPicker);
-            Variant variant = Variant.Load(variantDir);
-            manager.SaveVariant(variant);
+            VariantManager manager = await VariantManager.Load(LanguageNotDetectedPicker);
+            VariantAsset variant = await VariantAsset.Load(variantFilePath, true);
+            await manager.StoreVariant(variant);
             if (enable)
             {
-                manager.EnableVariant(variant.Metadata.Base.AssetId, variant.Metadata.Base.VersionId);
+                manager.SetVariantEnabled(variant, true);
             }
-            await manager.Save();
+            await manager.Flush();
+        }
+
+        static async Task VariantSetEnabled(VariantFilter filter, bool enabled)
+        {
+            VariantManager manager = await VariantManager.Load(LanguageNotDetectedPicker);
+            foreach (var variant in manager.FilterVariants(filter))
+            {
+                manager.SetVariantEnabled(variant, enabled);
+                PrintMetadata(variant);
+            }
+            await manager.Flush();
         }
 
         static async Task VariantEnableHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
         {
-            VariantManager manager = new(UserSettings.Instance.GameDirectory);
-            manager.LoadCache(LanguageNotDetectedPicker);
-            Console.WriteLine("Enabled the following variants:");
-            foreach (var entry in manager.GetVariantEntries(assetId, versionId, variantType, name, enabled))
+            VariantFilter filter = new()
             {
-                manager.EnableVariant(entry.Metadata.AssetId, entry.Metadata.AssetId);
-                PrintMetadata(entry.Type, entry.Metadata);
-            }
-            await manager.Save();
+                AssetId = assetId,
+                VersionId = versionId,
+                Name = name,
+                Enabled = enabled,
+                Type = variantType
+            };
+
+            Console.WriteLine("Enabled the following variants:");
+            await VariantSetEnabled(filter, true);
         }
 
         static async Task VariantDisableHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
         {
-            VariantManager manager = new(UserSettings.Instance.GameDirectory);
-            manager.LoadCache(LanguageNotDetectedPicker);
-            Console.WriteLine("Disabled the following variants:");
-            foreach (var entry in manager.GetVariantEntries(assetId, versionId, variantType, name, enabled))
-            {
-                manager.DisableVariant(entry.Metadata.AssetId, entry.Metadata.VersionId);
-                PrintMetadata(entry.Type, entry.Metadata);
-            }
-            await manager.Save();
-        }
+                VariantFilter filter = new()
+                {
+                    AssetId = assetId,
+                    VersionId = versionId,
+                    Name = name,
+                    Enabled = enabled,
+                    Type = variantType
+                };
 
-        static void PrintMetadata(VariantType type, VariantMetadataBase metadata)
+                Console.WriteLine("Disabled the following variants:");
+                await VariantSetEnabled(filter, false);
+            }
+
+        static void PrintMetadata(VariantAsset variant)
         {
             Console.WriteLine(new string('-', 48));
-            Console.WriteLine("Type: " + type);
-            Console.WriteLine("AssetId: " + metadata.AssetId);
-            Console.WriteLine("VersionId: " + metadata.VersionId);
-            Console.WriteLine("Name: " + metadata.PublicName);
-            Console.WriteLine("Description: " + metadata.Description);
+            Console.WriteLine("Type: " + variant.Type.ClassType);
+            Console.WriteLine("AssetId: " + variant.Variant.AssetId);
+            Console.WriteLine("VersionId: " + variant.Variant.VersionId);
+            Console.WriteLine("Name: " + variant.Variant.PublicName);
+            Console.WriteLine("Description: " + variant.Variant.Description);
+            if (variant.Enabled != null)
+            {
+                Console.WriteLine("Enabled: " + variant.Enabled);
+            }
         }
 
-        static string LanguagePicker(string? message = null)
+        static Language LanguagePicker(string? message = null)
         {
-            foreach (var language in VariantManager.LanguageCodes)
+            if (Language.Languages.Find(lang => lang.Code == UserSettings.Instance.Language) is Language match)
             {
-                if (UserSettings.Instance.Language == language.Code)
-                {
-                    return language.Code;
-                }
+                return match;
             }
 
             if (message != null)
@@ -402,35 +430,28 @@ namespace InfiniteVariantTool.CLI
                 Console.WriteLine(message);
             }
 
-            for (int i = 0; i < VariantManager.LanguageCodes.Count; i++)
+            for (int i = 0; i < Language.Languages.Count; i++)
             {
-                Console.WriteLine("[{0}] {1}", i + 1, VariantManager.LanguageCodes[i].Name);
+                Console.WriteLine("[{0}] {1}", i + 1, Language.Languages[i].Name);
             }
             while (true)
             {
-                Console.Write("Enter selection (1-{0}): ", VariantManager.LanguageCodes.Count);
-                if (int.TryParse(Console.ReadLine(), out int result))
+                Console.Write("Enter selection (1-{0}): ", Language.Languages.Count);
+                if (int.TryParse(Console.ReadLine(), out int result) && result >= 1 && result <= Language.Languages.Count)
                 {
-                    if (result <= 0 || result > VariantManager.LanguageCodes.Count)
-                    {
-                        Console.WriteLine("Invalid selection, please try again");
-                    }
-                    else
-                    {
-                        string code = VariantManager.LanguageCodes[result - 1].Code;
-                        UserSettings.Instance.Language = code;
-                        UserSettings.Instance.Save();
-                        return code;
-                    }
+                    Language selectedLang = Language.Languages[result - 1];
+                    UserSettings.Instance.Language = selectedLang.Code;
+                    UserSettings.Instance.Save();
+                    return selectedLang;
                 }
                 else
                 {
-                    Console.WriteLine("Invalid number, please try again");
+                    Console.WriteLine("Invalid selection, please try again");
                 }
             }
         }
 
-        static string LanguageNotDetectedPicker()
+        static Language LanguageNotDetectedPicker()
         {
             return LanguagePicker("Could not detect the in-game language. Select your language:");
         }

@@ -15,6 +15,7 @@ using System.Xml.Serialization;
 
 namespace InfiniteVariantTool.Tests
 {
+    /*
     [TestClass]
     public class VariantManifestTests
     {
@@ -109,4 +110,5 @@ namespace InfiniteVariantTool.Tests
             Assert.IsTrue(XNode.DeepEquals(manifestDoc, manifestFile.Doc));
         }
     }
+    */
 }

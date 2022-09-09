@@ -26,41 +26,17 @@ namespace InfiniteVariantTool.Tests
                     skip = true;
                     if (verbose)
                     {
-                        Console.WriteLine("Skipping XML file: " + f);
+                        Console.WriteLine("Skipping .xml file: " + f);
                     }
                 }
 
-                if (Util.ArrayStartsWith(data, Constants.pngSignature))
+                if (skipNonBond)
                 {
-                    if (skipNonBond)
+                    FileExtension ext = FileUtil.DetectFileType(data);
+                    if (ext != FileExtension.Bin)
                     {
+                        Console.WriteLine("Skipping " + ext.Value + " file: " + f);
                         skip = true;
-                    }
-                    if (verbose)
-                    {
-                        Console.WriteLine((skipNonBond ? "Skipping " : "") + "PNG file: " + f);
-                    }
-                }
-                else if (Util.ArrayStartsWith(data, Constants.jpgSignature))
-                {
-                    if (skipNonBond)
-                    {
-                        skip = true;
-                    }
-                    if (verbose)
-                    {
-                        Console.WriteLine((skipNonBond ? "Skipping " : "") + "JPG file: " + f);
-                    }
-                }
-                else if (data.First() == '{' && data.Last() == '}')
-                {
-                    if (skipNonBond)
-                    {
-                        skip = true;
-                    }
-                    if (verbose)
-                    {
-                        Console.WriteLine((skipNonBond ? "Skipping " : "") + "JSON file: " + f);
                     }
                 }
 
@@ -98,17 +74,7 @@ namespace InfiniteVariantTool.Tests
 
         public static string GetBuildNumber()
         {
-            string filename = Path.Combine(UserSettings.Instance.GameDirectory, Constants.OfflineCacheDirectory, "en-US", "other", "CacheMap.wcache");
-            CacheMap cm = new(filename);
-            foreach (var entry in cm.Map)
-            {
-                Match match = Regex.Match(entry.Value.Metadata.Url!, "^https://discovery-infiniteugc-intone.test.svc.halowaypoint.com/hi/manifests/builds/([^/]*)/game$");
-                if (match.Success)
-                {
-                    return match.Groups[1].Value;
-                }
-            }
-            throw new Exception();
+            return FileUtil.GetBuildNumber(UserSettings.Instance.GameDirectory);
         }
     }
 

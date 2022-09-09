@@ -51,7 +51,7 @@ namespace InfiniteVariantTool.Tests
                 BondReader br = new(data);
                 var unpacked = br.Read();
                 unpacked.Save(outputFile + ".xml");
-                BondWriter bw = new(unpacked);
+                BondWriter bw = new(outputFile + ".xml");
                 byte[] repacked = bw.Save(outputFile);
                 Assert.IsTrue(data.SequenceEqual(repacked));
             }

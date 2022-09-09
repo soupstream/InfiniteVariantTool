@@ -41,9 +41,7 @@ namespace InfiniteVariantTool.Core.Serialization
         {
             doc = result.Doc;
             result.SetFileName("tmp");
-            blobs = result.Blobs.ToDictionary(
-                kv => kv.Item1,
-                kv => kv.Item2);
+            blobs = result.Blobs;
         }
 
         public byte[] Save(string filename)

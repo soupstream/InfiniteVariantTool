@@ -1,4 +1,6 @@
-﻿using InfiniteVariantTool.Core.Cache;
+﻿using InfiniteVariantTool.Core.BondSchema;
+using InfiniteVariantTool.Core.Cache;
+using InfiniteVariantTool.Core.Settings;
 using InfiniteVariantTool.Core.Utils;
 using InfiniteVariantTool.Core.Variants;
 using System;
@@ -15,413 +17,310 @@ namespace InfiniteVariantTool.Core
 {
     public class VariantManager
     {
-        public record LanguageInfo(
-            string ShortCode,
-            string Code,
-            string Name);
-
-        public static List<LanguageInfo> LanguageCodes { get; } = new()
-        {
-            new("en",  "en-US", "English"),
-            new("jpn", "ja-JP", "Japanese"),
-            new("de",  "de-DE", "German"),
-            new("fr",  "fr-FR", "French"),
-            new("sp",  "es-ES", "Spanish"),
-            new("mx",  "es-MX", "Spanish (Mexico)"),
-            new("it",  "it-IT", "Italian"),
-            new("kor", "ko-KR", "Korean"),
-            new("cht", "zh-TW", "Chinese (Traditional)"),
-            new("chs", "zh-CN", "Chinese (Simplified)"),
-            new("pl",  "pl-PL", "Polish"),
-            new("ru",  "ru-RU", "Russian"),
-            new("nl",  "nl-NL", "Dutch"),
-            new("br",  "pt-BR", "Portuguese (Brazil)"),
-
-            new("dk", "", ""),
-            new("fi", "", ""),
-            new("no", "", ""),
-            new("pt", "", "")
-        };
-        public static Dictionary<string, LanguageInfo> LanguageCodeMap { get; } = LanguageCodes
-            .Where(info => info.Code != "")
-            .ToDictionary(
-                info => info.Code,
-                info => info);
-
         private string gameDir;
-        // the offline cache is currently busted so remove support for now
-        public OfflineCacheManager? OfflineCache { get; private set; }
-        public OnlineCacheManager? OnlineCache { get; private set; }
-        public LanCacheManager? LanCache { get; private set; }
-        public UserCacheManager? UserCache { get; private set; }
+        private Language language;
+        private CacheManager PrimaryCache => OnlineCache;   // source of truth
+        public CacheManager OnlineCache { get; }
+        public CacheManager OfflineCache { get; }
+        public CacheManager LanCache { get; }
+        private UserCacheManager userCache;
+        private List<CacheManager> caches;  // caches to update
+        private List<VariantAsset> variantAssets;
 
-        [MemberNotNullWhen(true, nameof(OnlineCache), nameof(LanCache))]
-        private bool CachesAreInitialized => OnlineCache != null && LanCache != null;
-
-        public VariantManager(string gameDir)
+        private VariantManager(string gameDir, Language language, UserCacheManager userCache, CacheManager onlineCache, CacheManager offlineCache, CacheManager lanCache)
         {
             this.gameDir = gameDir;
             if (!File.Exists(Path.Combine(gameDir, Constants.GameExeName)))
             {
                 throw new FileNotFoundException("Game not found at " + gameDir);
             }
+            this.language = language;
+
+            this.userCache = userCache;
+            OnlineCache = onlineCache;
+            LanCache = lanCache;
+            OfflineCache = offlineCache;
+            caches = new() { onlineCache, lanCache };
+            variantAssets = new();
+            RefreshAssetList();
         }
 
-        public void LoadCache(Func<string> languagePicker)
+        public static async Task<VariantManager> Load(Func<Language> languagePicker)
         {
-            string buildNumber = Util.GetBuildNumber();
-            OfflineCache = new(Path.Combine(gameDir, Constants.OfflineCacheDirectory), "en-US");
-            OfflineCache.BuildNumber = buildNumber;
-            OfflineCache.LoadGameManifest();
-
-            OnlineCache = new(Path.Combine(gameDir, Constants.OnlineCacheDirectory));
-            OnlineCache.LoadCacheMap();
-            OnlineCache.BuildNumber = buildNumber;
-            OnlineCache.LoadGameManifest();
-            OnlineCache.LoadCustomsManifest();
-
-            LanCache = new(Path.Combine(gameDir, Constants.LanCacheDirectory));
-            LanCache.LoadCacheMap();
-            LanCache.BuildNumber = buildNumber;
-            LanCache.AssetId = OfflineCache.GameManifest!.Base.AssetId;
-            LanCache.VersionId = OfflineCache.GameManifest.Base.VersionId;
-            LanCache.LoadGameManifest();
-
-            OnlineCache.Language ??= LanCache.Language ?? languagePicker();
-            LanCache.Language ??= OnlineCache.Language;
+            return await Load(UserSettings.Instance.GameDirectory, UserSettings.Instance.VariantDirectory, languagePicker);
         }
 
-        public UserCacheManager LoadUserCache(string modDir)
+        public static async Task<VariantManager> Load(string gameDir, string userCacheDir, Func<Language> languagePicker)
         {
-            UserCache = new(modDir);
-            UserCache.LoadEntries();
-            return UserCache;
-        }
-
-        public async Task<CacheFile?> GetFile(string url, ContentType contentType)
-        {
-            if (!CachesAreInitialized)
+            if (!File.Exists(Path.Combine(gameDir, Constants.GameExeName)))
             {
-                throw new InvalidOperationException();
+                throw new FileNotFoundException("Game not found at " + gameDir);
             }
+            var caches = await CacheManager.LoadAllCaches(gameDir, languagePicker);
+            UserCacheManager userCache = new(userCacheDir);
+            await userCache.LoadEntries();
+            VariantManager variantManager = new(gameDir, caches.Online.Language!, userCache, caches.Online, caches.Offline, caches.Lan);
+            return variantManager;
+        }
 
-            foreach (ICacheManager cache in new ICacheManager[] { OnlineCache, LanCache })
+        // get variant entry from game manifest
+        public BondAsset? GetVariantEntry(Guid assetId, Guid versionId, VariantType type)
+        {
+            List<BondAsset> links = PrimaryCache.GameManifest.LinksByType(type);
+            return links.Find(entry => (Guid)entry.AssetId == assetId && (Guid)entry.VersionId == versionId);
+        }
+
+        public async Task<VariantAsset> GetVariant(Guid assetId, Guid versionId, VariantType type)
+        {
+            var apiCall = PrimaryCache.GetDiscoveryApiCall(assetId, versionId, type);
+            BondAsset variant = (BondAsset)await PrimaryCache.GetBondFile(apiCall, type.ClassType);
+            VariantAsset variantAsset = new(variant);
+
+            // filter out unneeded files
+            IEnumerable<string> fileRelativePaths = variant.Files.FileRelativePaths
+                .Where(path => !Language.Languages.Any(lang => path.EndsWith($".{lang.ShortCode}")))
+                .Where(path => path.EndsWith($"_{language.ShortCode}.bin") || !Language.Languages.Any(lang => path.EndsWith($"_{lang.ShortCode}.bin")))
+                .Where(path => !path.EndsWith("_guid.txt"));
+
+            foreach (string relativePath in fileRelativePaths)
             {
-                CacheFile? cacheFile = await cache.GetFile(url, contentType);
-                if (cacheFile != null)
+                ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
                 {
-                    return cacheFile;
-                }
+                    { "path", variant.Files.Prefix + relativePath },
+                });
+                variantAsset.Files[relativePath] = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
             }
-            return null;
+            return variantAsset;
         }
 
-        public async Task<CacheFile> GetOrDownloadFile(string url, ContentType contentType)
+        public async Task<VariantAsset> GetVariant(Guid assetId, Guid versionId, VariantType type, bool getLinkedVariant)
         {
-            if (await GetFile(url, contentType) is CacheFile result)
+            VariantAsset variant = await GetVariant(assetId, versionId, type);
+            if (getLinkedVariant && variant.Variant is UgcGameVariant ugcVar && ugcVar.EngineGameVariantLink is BondAsset engineVar)
             {
-                return result;
+                VariantAsset link = await GetVariant((Guid)engineVar.AssetId, (Guid)engineVar.VersionId, VariantType.EngineGameVariant);
+                variant.LinkedVariants.Add(link);
             }
-
-            VariantDownloader downloader = new();
-            byte[] data = await downloader.DownloadFile(url, OnlineCache!.Language, contentType)
-                ?? throw new HttpRequestException("Received status " + downloader.StatusCode + " for: " + url);
-            return new CacheFile(data, contentType, false);
+            return variant;
         }
 
-        public IEnumerable<UserVariantEntry> GetUserVariantEntries()
+        public async Task StoreVariant(VariantAsset variant)
         {
-            if (UserCache == null || !CachesAreInitialized || OnlineCache.CustomsManifest == null)
+            VariantType type = variant.Type;
+            foreach (CacheManager cache in caches)
             {
-                throw new InvalidOperationException();
-            }
+                var apiCall = cache.GetDiscoveryApiCall((Guid)variant.Variant.AssetId, (Guid)variant.Variant.VersionId, type);
 
-            foreach (var entry in UserCache.GetEntries())
-            {
-                bool? actualEnabled = null;
-                if (entry.Metadata.Type != VariantType.EngineGameVariant)
+                // store files in cache
+                await cache.StoreBondFile(variant.Variant, apiCall);
+                foreach (var file in variant.Files)
                 {
-                    actualEnabled = OnlineCache.CustomsManifest.GetVariants(entry.Metadata.Base.AssetId, entry.Metadata.Base.VersionId, null, null).Any();
-                }
-                entry.Enabled = actualEnabled;
-                yield return entry;
-            }
-        }
-
-        public void RemoveUserVariant(string path)
-        {
-            if (UserCache == null)
-            {
-                throw new InvalidOperationException();
-            }
-            UserCache.RemoveVariant(path);
-        }
-
-        public IEnumerable<VariantEntry> GetVariantEntries(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
-        {
-            if (!CachesAreInitialized || OnlineCache.GameManifest == null || OnlineCache.CustomsManifest == null)
-            {
-                throw new InvalidOperationException();
-            }
-
-            foreach (VariantEntry entry in OnlineCache.GameManifest.GetVariants(assetId, versionId, variantType, name))
-            {
-                if (entry.Type == VariantType.EngineGameVariant)
-                {
-                    if (enabled == null)
+                    ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Variant.Files.PrefixEndpoint.AuthorityId, new()
                     {
-                        yield return entry;
-                    }
+                        { "path", variant.Variant.Files.Prefix + file.Key },
+                    });
+                    await cache.StoreFile(file.Value, fileApiCall, MimeType.OctetStream);
+                }
+
+                // add to game manifest
+                BondAsset entry = new(variant.Variant);
+                List<BondAsset> links = cache.GameManifest.LinksByType(type);
+                int index = links.FindIndex(link => link.GuidsEqual(variant.Variant));
+                if (index == -1)
+                {
+                    links.Add(entry);
                 }
                 else
                 {
-                    bool actualEnabled = OnlineCache.CustomsManifest.GetVariants(entry.Metadata.AssetId, entry.Metadata.VersionId, null, null).Any();
-                    if (enabled == null || enabled == actualEnabled)
+                    links[index] = entry;
+                }
+
+                // update customs manifest
+                if (type != VariantType.EngineGameVariant)
+                {
+                    var customsLinks = cache.CustomsManifest.LinksByType(type);
+                    if (customsLinks != null)
                     {
-                        entry.Enabled = actualEnabled;
-                        yield return entry;
-                    }
-                }
-            }
-        }
-
-        public async IAsyncEnumerable<Variant> GetVariants(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled,
-            bool getFiles, bool downloadMissingFiles, bool downloadLuaSource)
-        {
-            foreach (VariantEntry entry in GetVariantEntries(assetId, versionId, variantType, name, enabled))
-            {
-                string url = GetVariantUrl(entry.Type, entry.Metadata.AssetId, entry.Metadata.VersionId);
-                CacheFile metadataCacheFile = await GetOrDownloadFile(url, ContentType.Bond);
-                VariantMetadata metadata = VariantMetadata.FromXml(entry.Type, metadataCacheFile.Doc);
-                Dictionary<string, CacheFile> files;
-                if (getFiles)
-                {
-                    files = await GetVariantFiles(metadata, downloadMissingFiles, downloadLuaSource);
-                }
-                else
-                {
-                    files = new();
-                }
-                var variant = Variant.FromMetadata(metadata, files);
-                variant.Enabled = entry.Enabled;
-                yield return variant;
-            }
-        }
-
-        public async Task<Variant> GetVariant(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled, bool includeLinkedVariant,
-            bool getFiles, bool downloadMissingFiles, bool downloadLuaSource)
-        {
-            Variant? ret = null;
-            await foreach (var variant in GetVariants(assetId, versionId, variantType, name, enabled, getFiles, downloadMissingFiles, downloadLuaSource))
-            {
-                if (ret != null)
-                {
-                    throw new Exception("More than one match");
-                }
-                ret = variant;
-            }
-            if (ret == null)
-            {
-                throw new Exception("No matches");
-            }
-
-            if (includeLinkedVariant && ret is UgcGameVariant ugcGameVariant && ugcGameVariant.Metadata.EngineGameVariantLink != null)
-            {
-                Guid linkAssetId = ugcGameVariant.Metadata.EngineGameVariantLink.AssetId;
-                Guid linkVersionId = ugcGameVariant.Metadata.EngineGameVariantLink.VersionId;
-                await foreach (var variant in GetVariants(linkAssetId, linkVersionId, VariantType.EngineGameVariant, null, null, getFiles, downloadMissingFiles, downloadLuaSource))
-                {
-                    ugcGameVariant.LinkedEngineGameVariant = (EngineGameVariant)variant;
-                    break;
-                }
-            }
-
-            return ret;
-        }
-
-        private async Task<Dictionary<string, CacheFile>> GetVariantFiles(VariantMetadata metadata, bool downloadMissingFiles = true, bool downloadLuaSource = true)
-        {
-            if (!CachesAreInitialized)
-            {
-                throw new InvalidOperationException();
-            }
-
-            Dictionary<string, CacheFile> files = new();
-            foreach (string path in metadata.Base.FileRelativePaths)
-            {
-                bool includeFile = false;
-                ContentType contentType = ContentType.Bin;
-                if (path.StartsWith("CustomGamesUIMarkup"))
-                {
-                    string shortLanguageCode = LanguageCodeMap[OnlineCache.Language!].ShortCode;
-                    if (path.EndsWith($"_{shortLanguageCode}.bin"))
-                    {
-                        includeFile = true;
-                        contentType = ContentType.Undefined;
-                    }
-                }
-                else if (path.EndsWith(".mvar") || path.EndsWith(".bin"))
-                {
-                    includeFile = true;
-                    contentType = ContentType.Undefined;
-                }
-                else if (path.EndsWith(".png", StringComparison.InvariantCultureIgnoreCase)
-                    || (downloadLuaSource && path.EndsWith(".debugscriptsource")))
-                {
-                    includeFile = true;
-                    contentType = ContentType.Undefined;
-                }
-                if (includeFile)
-                {
-                    string fileUrl = metadata.Base.Prefix + path;
-                    if (downloadMissingFiles)
-                    {
-                        files[path] = await GetOrDownloadFile(fileUrl, contentType);
-                    }
-                    else
-                    {
-                        if (await GetFile(fileUrl, contentType) is CacheFile result)
+                        index = customsLinks.FindIndex(link => link.GuidsEqual(variant.Variant));
+                        if (index != -1)
                         {
-                            files[path] = result;
+                            customsLinks[index] = entry;
                         }
                     }
                 }
             }
-
-            return files;
         }
 
-        public void SaveVariant(Variant variant)
+        public bool SetVariantEnabled(VariantAsset variant, bool enabled)
         {
-            if (!CachesAreInitialized || OnlineCache.GameManifest == null)
-            {
-                throw new InvalidOperationException();
-            }
+            return SetVariantEnabled((Guid)variant.Variant.AssetId, (Guid)variant.Variant.VersionId, variant.Type, enabled);
+        }
 
-            foreach (var entry in variant.Files)
+        public bool SetVariantEnabled(Guid assetId, Guid versionId, VariantType type, bool enabled)
+        {
+            List<BondAsset>? customsEntries = PrimaryCache.CustomsManifest.LinksByType(type);
+            if (customsEntries == null)
             {
-                string path = entry.Key;
-
-                // switch language-specific files to user's language
-                var match = Regex.Match(entry.Key, @"_([a-z]{2,3})\.bin$");
-                if (match.Success)
+                return false;
+            }    
+            int index = customsEntries.FindIndex(link => link.GuidsEqual(assetId, versionId));
+            if (enabled)
+            {
+                BondAsset? entry = GetVariantEntry(assetId, versionId, type);
+                if (entry == null)
                 {
-                    string languageCode = LanguageCodeMap[OnlineCache.Language!].ShortCode;
-                    path = path[..match.Groups[1].Index] + languageCode + ".bin";
+                    return false;
                 }
-
-                string fileUrl = variant.Metadata.Base.Prefix + path;
-                OnlineCache.SaveFile(entry.Value, fileUrl);
-            }
-            var metadataCacheFile = new CacheFile(variant.Metadata.Serialize());
-            OnlineCache.SaveFile(metadataCacheFile, variant.Url);
-
-            VariantMetadataBase newEntry = new(variant.Metadata.Base);
-            newEntry.IsBaseStruct = false;
-            newEntry.FileRelativePaths.RemoveAll(path => !path.EndsWith(".png", StringComparison.InvariantCultureIgnoreCase));
-            OnlineCache.GameManifest.AddVariant(variant.Type, newEntry);
-        }
-
-        public async Task RemoveVariant(Guid assetId, Guid versionId)
-        {
-            if (!CachesAreInitialized || OnlineCache.GameManifest == null || OnlineCache.CustomsManifest == null)
-            {
-                throw new InvalidOperationException();
-            }
-
-            List<(Guid, Guid)> variantsToRemove = new();
-            await foreach (var variant in GetVariants(assetId, versionId, null, null, null, false, false, false))
-            {
-                foreach (string path in variant.Metadata.Base.FileRelativePaths)
+                else
                 {
-                    string fileUrl = variant.Metadata.Base.Prefix + path;
-                    OnlineCache.RemoveFile(fileUrl);
+                    if (index == -1)
+                    {
+                        customsEntries.Add(entry);
+                    }
+                    else
+                    {
+                        customsEntries[index] = entry;
+                    }
+                    return true;
                 }
-                OnlineCache.RemoveFile(variant.Url);
-                variantsToRemove.Add((assetId, versionId));
             }
-
-            foreach ((var assetId_, var versionId_) in variantsToRemove)
+            else
             {
-                OnlineCache.GameManifest.RemoveVariant(assetId_, versionId_, null, null);
-                OnlineCache.CustomsManifest.RemoveVariant(assetId_, versionId_, null, null);
-            }
-        }
-
-        public string GetVariantUrl(VariantType variantType, Guid assetId, Guid versionId)
-        {
-            string variantTypeString = variantType switch
-            {
-                VariantType.MapVariant => "maps",
-                VariantType.UgcGameVariant => "ugcGameVariants",
-                VariantType.EngineGameVariant => "engineGameVariants",
-                _ => throw new ArgumentException()
-            };
-            return $"https://discovery-infiniteugc.test.svc.halowaypoint.com/hi/{variantTypeString}/{assetId}/versions/{versionId}";
-        }
-
-        public async Task Save()
-        {
-            if (!CachesAreInitialized)
-            {
-                throw new InvalidOperationException();
-            }
-
-            //OfflineCache.EnableAllVariants();
-            OnlineCache.Save();
-
-            OnlineCache.GameManifest = new(OnlineCache.GameManifest!);
-            OnlineCache.CustomsManifest = new(OnlineCache.CustomsManifest!);
-
-            ConvertMetadataUrlsToOnline(OnlineCache.GameManifest.PlaylistLinks);
-            ConvertMetadataUrlsToOnline(OnlineCache.GameManifest.EngineGameVariantLinks);
-            ConvertMetadataUrlsToOnline(OnlineCache.GameManifest.MapLinks);
-            ConvertMetadataUrlsToOnline(OnlineCache.GameManifest.UgcGameVariantLinks);
-
-            ConvertMetadataUrlsToOnline(OnlineCache.CustomsManifest.PlaylistLinks);
-            ConvertMetadataUrlsToOnline(OnlineCache.CustomsManifest.EngineGameVariantLinks);
-            ConvertMetadataUrlsToOnline(OnlineCache.CustomsManifest.MapLinks);
-            ConvertMetadataUrlsToOnline(OnlineCache.CustomsManifest.UgcGameVariantLinks);
-
-            OnlineCache.Save();
-            LanCache.EndpointsFile = await GetFile(LanCache.EndpointsFileUrl, ContentType.Bond);
-            LanCache.GameManifest = new(OnlineCache.GameManifest!);
-            LanCache.Save();
-        }
-
-        private void ConvertMetadataUrlsToOnline(List<VariantMetadataBase> metadatas)
-        {
-            foreach (var metadata in metadatas)
-            {
-                metadata.Prefix = ConvertUrlToOnline(metadata.Prefix);
+                if (index == -1)
+                {
+                    return false;
+                }
+                else
+                {
+                    customsEntries.RemoveAt(index);
+                    return true;
+                }
             }
         }
 
-        private string ConvertUrlToOnline(string url)
+        public async Task RemoveVariant(VariantAsset variant)
         {
-            return url.Replace("-test.test", "").Replace("-intone.test", "");
+            await RemoveVariant((Guid)variant.Variant.AssetId, (Guid)variant.Variant.VersionId, variant.Type);
         }
 
-        public void EnableVariant(Guid assetId, Guid versionId)
+        public async Task RemoveVariant(Guid assetId, Guid versionId, VariantType type)
         {
-            if (!CachesAreInitialized || OnlineCache.CustomsManifest == null)
+            foreach (CacheManager cache in caches)
             {
-                throw new InvalidOperationException();
-            }
+                ApiCall apiCall = cache.GetDiscoveryApiCall(assetId, versionId, type);
+                BondAsset? metadata = await cache.TryGetCachedBondFile<BondAsset>(apiCall);
+                if (metadata != null)
+                {
+                    foreach (string relativePath in metadata.Files.FileRelativePaths)
+                    {
+                        ApiCall fileApiCall = PrimaryCache.Api.Call(metadata.Files.PrefixEndpoint.AuthorityId, new()
+                        {
+                            { "path", metadata.Files.Prefix + relativePath },
+                        });
 
-            VariantEntry gameManifestEntry = OnlineCache.GameManifest?.GetVariants(assetId, versionId, null, null).FirstOrDefault()
-                ?? throw new Exception("Variant does not exist");
-            OnlineCache.CustomsManifest.AddVariant(gameManifestEntry);
+                        cache.RemoveFile(fileApiCall);
+                    }
+                }
+                cache.RemoveFile(apiCall);
+
+                // remove from game manifest
+                List<BondAsset> links = cache.GameManifest.LinksByType(type);
+                links.RemoveAll(link => link.GuidsEqual(assetId, versionId));
+
+                // remove from customs manifest
+                if (type != VariantType.EngineGameVariant)
+                {
+                    List<BondAsset>? customsLinks = cache.CustomsManifest.LinksByType(type);
+                    customsLinks?.RemoveAll(link => link.GuidsEqual(assetId, versionId));
+                }
+            }
         }
 
-        public void DisableVariant(Guid assetId, Guid versionId)
+        public async Task Flush()
         {
-            if (!CachesAreInitialized || OnlineCache.CustomsManifest == null)
+            foreach (var cache in caches)
             {
-                throw new InvalidOperationException();
+                await cache.Flush();
             }
+        }
 
-            OnlineCache.CustomsManifest.RemoveVariant(assetId, versionId, null, null);
+        #region list variants
+
+        private IEnumerable<VariantAsset> GetAssetList()
+        {
+            foreach (VariantType type in VariantType.VariantTypes)
+            {
+                var links = PrimaryCache.GameManifest.LinksByType(type);
+                foreach (BondAsset link in links)
+                {
+                    VariantAsset variant = new(link, type);
+                    yield return variant;
+                }
+            }
+        }
+
+        private void UpdateVariantsStatus(IEnumerable<VariantAsset> variants)
+        {
+            foreach (VariantType type in VariantType.VariantTypes)
+            {
+                var customsLinks = PrimaryCache.CustomsManifest.LinksByType(type);
+                foreach (VariantAsset variant in variants)
+                {
+                    variant.Enabled = customsLinks?.Any(customsLink => customsLink.GuidsEqual(variant.Variant));
+                }
+            }
+        }
+
+        private void RefreshAssetList()
+        {
+            variantAssets.Clear();
+            variantAssets.AddRange(GetAssetList());
+            UpdateVariantsStatus(variantAssets);
+            UpdateVariantsStatus(userCache.Entries);
+        }
+
+        public IEnumerable<VariantAsset> FilterVariants(VariantFilter filter)
+        {
+            return FilterVariants(variantAssets, filter);
+        }
+
+        public IEnumerable<VariantAsset> FilterUserVariants(VariantFilter filter)
+        {
+            return FilterVariants(userCache.Entries, filter);
+        }
+
+        public IEnumerable<VariantAsset> FilterVariants(IEnumerable<VariantAsset> variants, VariantFilter filter)
+        {
+            return variants.Where(variant => (filter.Types?.Any(type => type == variant.Type) is null or true)
+                && (filter.AssetId?.Equals((Guid)variant.Variant.AssetId) is null or true)
+                && (filter.VersionId?.Equals((Guid)variant.Variant.VersionId) is null or true)
+                && (filter.Name?.Equals(variant.Variant.PublicName, StringComparison.CurrentCultureIgnoreCase) is null or true)
+                && (filter.Enabled?.Equals(variant.Enabled) is null or true));
+        }
+
+        #endregion
+    }
+
+    public class VariantFilter
+    {
+        public Guid? AssetId { get; set; }
+        public Guid? VersionId { get; set; }
+        public string? Name { get; set; }
+        public bool? Enabled { get; set; }
+        public List<VariantType>? Types { get; set; }
+        public VariantType? Type
+        {
+            set
+            {
+                if (value == null)
+                {
+                    Types = null;
+                }
+                else
+                {
+                    Types = new() { value };
+                }
+            }
         }
     }
 }

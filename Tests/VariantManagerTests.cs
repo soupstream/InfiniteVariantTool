@@ -15,6 +15,7 @@ using System.Xml.Serialization;
 
 namespace InfiniteVariantTool.Tests
 {
+    /*
     [TestClass]
     public class VariantManagerTests
     {
@@ -75,4 +76,5 @@ namespace InfiniteVariantTool.Tests
             Assert.IsTrue(unpackedLinkedVariant);
         }
     }
+    */
 }
