@@ -22,7 +22,15 @@ namespace InfiniteVariantTool.Tests
         [TestMethod]
         public async Task TestLoadAllCaches()
         {
-            var caches = await CacheManager.LoadAllCaches(UserSettings.Instance.GameDirectory, () => Language.En);
+            var caches = await CacheManager.LoadAllCaches(() => Language.En);
+
+            string outDir = GetType().Name;
+            Directory.CreateDirectory(outDir);
+            File.WriteAllText(Path.Combine(outDir, "game-manifest.json"),
+                SchemaSerializer.SerializeJson(caches.Online.GameManifest));
+            File.WriteAllText(Path.Combine(outDir, "customs-manifest.json"),
+                SchemaSerializer.SerializeJson(caches.Online.CustomsManifest));
+            Console.WriteLine(Path.GetFullPath(outDir));
         }
     }
 }

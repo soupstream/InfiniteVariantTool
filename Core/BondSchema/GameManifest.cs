@@ -62,29 +62,5 @@ namespace InfiniteVariantTool.Core.BondSchema
         }
 
         #endregion
-
-        #region MyExtensions
-
-        public List<BondAsset> LinksByType(VariantType type)
-        {
-            if (type == VariantType.UgcGameVariant)
-            {
-                return UgcGameVariantLinks;
-            }
-            else if (type == VariantType.EngineGameVariant)
-            {
-                return EngineGameVariantLinks;
-            }
-            else if (type == VariantType.MapVariant)
-            {
-                return MapLinks;
-            }
-            else
-            {
-                throw new KeyNotFoundException();
-            }
-        }
-
-        #endregion
     }
 }

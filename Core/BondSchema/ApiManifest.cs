@@ -50,6 +50,16 @@ namespace InfiniteVariantTool.Core.BondSchema
                 AuthorityId = "";
                 AuthenticationMethods = new();
             }
+
+            // copy constructor
+            public Authority(Authority other)
+            {
+                AuthorityId = other.AuthorityId;
+                Scheme = other.Scheme;
+                Hostname = other.Hostname;
+                Port = other.Port;
+                AuthenticationMethods = new(other.AuthenticationMethods);
+            }
         }
 
         [Bond.Schema]
@@ -86,6 +96,7 @@ namespace InfiniteVariantTool.Core.BondSchema
             {
                 MaxRetryCount = 3;
                 RetryDelayMs = 2000;
+                RetryGrowth = 2;
                 RetryJitterMs = 150;
             }
         }

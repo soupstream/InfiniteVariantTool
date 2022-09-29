@@ -30,12 +30,7 @@ namespace InfiniteVariantTool.Core
         private VariantManager(string gameDir, Language language, UserCacheManager userCache, CacheManager onlineCache, CacheManager offlineCache, CacheManager lanCache)
         {
             this.gameDir = gameDir;
-            if (!File.Exists(Path.Combine(gameDir, Constants.GameExeName)))
-            {
-                throw new FileNotFoundException("Game not found at " + gameDir);
-            }
             this.language = language;
-
             this.userCache = userCache;
             OnlineCache = onlineCache;
             LanCache = lanCache;
@@ -45,18 +40,17 @@ namespace InfiniteVariantTool.Core
             RefreshAssetList();
         }
 
+        // load with user settings
         public static async Task<VariantManager> Load(Func<Language> languagePicker)
         {
-            return await Load(UserSettings.Instance.GameDirectory, UserSettings.Instance.VariantDirectory, languagePicker);
+            string gameDir = UserSettings.Instance.GameDirectory;
+            string buildNumber = FileUtil.GetBuildNumber(gameDir);
+            return await Load(UserSettings.Instance.GameDirectory, UserSettings.Instance.VariantDirectory, buildNumber, languagePicker);
         }
 
-        public static async Task<VariantManager> Load(string gameDir, string userCacheDir, Func<Language> languagePicker)
+        public static async Task<VariantManager> Load(string gameDir, string userCacheDir, string buildNumber, Func<Language> languagePicker)
         {
-            if (!File.Exists(Path.Combine(gameDir, Constants.GameExeName)))
-            {
-                throw new FileNotFoundException("Game not found at " + gameDir);
-            }
-            var caches = await CacheManager.LoadAllCaches(gameDir, languagePicker);
+            var caches = await CacheManager.LoadAllCaches(gameDir, buildNumber, languagePicker);
             UserCacheManager userCache = new(userCacheDir);
             await userCache.LoadEntries();
             VariantManager variantManager = new(gameDir, caches.Online.Language!, userCache, caches.Online, caches.Offline, caches.Lan);
@@ -66,7 +60,7 @@ namespace InfiniteVariantTool.Core
         // get variant entry from game manifest
         public BondAsset? GetVariantEntry(Guid assetId, Guid versionId, VariantType type)
         {
-            List<BondAsset> links = PrimaryCache.GameManifest.LinksByType(type);
+            List<BondAsset> links = type.GetLinks(PrimaryCache.GameManifest);
             return links.Find(entry => (Guid)entry.AssetId == assetId && (Guid)entry.VersionId == versionId);
         }
 
@@ -86,7 +80,7 @@ namespace InfiniteVariantTool.Core
             {
                 ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
                 {
-                    { "path", variant.Files.Prefix + relativePath },
+                    { "path", variant.Files.PrefixEndpoint.Path + relativePath },
                 });
                 variantAsset.Files[relativePath] = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
             }
@@ -117,14 +111,14 @@ namespace InfiniteVariantTool.Core
                 {
                     ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Variant.Files.PrefixEndpoint.AuthorityId, new()
                     {
-                        { "path", variant.Variant.Files.Prefix + file.Key },
+                        { "path", variant.Variant.Files.PrefixEndpoint.Path + file.Key },
                     });
                     await cache.StoreFile(file.Value, fileApiCall, MimeType.OctetStream);
                 }
 
                 // add to game manifest
                 BondAsset entry = new(variant.Variant);
-                List<BondAsset> links = cache.GameManifest.LinksByType(type);
+                List<BondAsset> links = type.GetLinks(cache.GameManifest);
                 int index = links.FindIndex(link => link.GuidsEqual(variant.Variant));
                 if (index == -1)
                 {
@@ -138,7 +132,7 @@ namespace InfiniteVariantTool.Core
                 // update customs manifest
                 if (type != VariantType.EngineGameVariant)
                 {
-                    var customsLinks = cache.CustomsManifest.LinksByType(type);
+                    var customsLinks = type.GetLinks(cache.CustomsManifest);
                     if (customsLinks != null)
                     {
                         index = customsLinks.FindIndex(link => link.GuidsEqual(variant.Variant));
@@ -158,7 +152,7 @@ namespace InfiniteVariantTool.Core
 
         public bool SetVariantEnabled(Guid assetId, Guid versionId, VariantType type, bool enabled)
         {
-            List<BondAsset>? customsEntries = PrimaryCache.CustomsManifest.LinksByType(type);
+            List<BondAsset>? customsEntries = type.GetLinks(PrimaryCache.CustomsManifest);
             if (customsEntries == null)
             {
                 return false;
@@ -215,7 +209,7 @@ namespace InfiniteVariantTool.Core
                     {
                         ApiCall fileApiCall = PrimaryCache.Api.Call(metadata.Files.PrefixEndpoint.AuthorityId, new()
                         {
-                            { "path", metadata.Files.Prefix + relativePath },
+                            { "path", metadata.Files.PrefixEndpoint.Path + relativePath },
                         });
 
                         cache.RemoveFile(fileApiCall);
@@ -224,13 +218,13 @@ namespace InfiniteVariantTool.Core
                 cache.RemoveFile(apiCall);
 
                 // remove from game manifest
-                List<BondAsset> links = cache.GameManifest.LinksByType(type);
+                List<BondAsset> links = type.GetLinks(cache.GameManifest);
                 links.RemoveAll(link => link.GuidsEqual(assetId, versionId));
 
                 // remove from customs manifest
                 if (type != VariantType.EngineGameVariant)
                 {
-                    List<BondAsset>? customsLinks = cache.CustomsManifest.LinksByType(type);
+                    List<BondAsset>? customsLinks = type.GetLinks(cache.CustomsManifest);
                     customsLinks?.RemoveAll(link => link.GuidsEqual(assetId, versionId));
                 }
             }
@@ -250,7 +244,7 @@ namespace InfiniteVariantTool.Core
         {
             foreach (VariantType type in VariantType.VariantTypes)
             {
-                var links = PrimaryCache.GameManifest.LinksByType(type);
+                var links = type.GetLinks(PrimaryCache.GameManifest);
                 foreach (BondAsset link in links)
                 {
                     VariantAsset variant = new(link, type);
@@ -261,12 +255,11 @@ namespace InfiniteVariantTool.Core
 
         private void UpdateVariantsStatus(IEnumerable<VariantAsset> variants)
         {
-            foreach (VariantType type in VariantType.VariantTypes)
+            foreach (VariantAsset variant in variants)
             {
-                var customsLinks = PrimaryCache.CustomsManifest.LinksByType(type);
-                foreach (VariantAsset variant in variants)
+                var customsLinks = variant.Type.GetLinks(PrimaryCache.CustomsManifest);
                 {
-                    variant.Enabled = customsLinks?.Any(customsLink => customsLink.GuidsEqual(variant.Variant));
+                    variant.Enabled = customsLinks?.Any(customsLink => customsLink.AssetIdEqual(variant.Variant));
                 }
             }
         }

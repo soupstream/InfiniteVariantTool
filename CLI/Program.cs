@@ -82,7 +82,7 @@ namespace InfiniteVariantTool.CLI
                     new Argument<string>("url", "Content URL to hash")
                 }
                 .Also(cmd => cmd.SetHandler(
-                    (ApiType apiType, string url, InvocationContext ctx) => UrlHashHandler(url, apiType, ctx),
+                    async (ApiType apiType, string url, InvocationContext ctx) => await UrlHashHandler(url, apiType, ctx),
                     cmd.Arguments[0],
                     cmd.Arguments[1])),
 
@@ -267,15 +267,15 @@ namespace InfiniteVariantTool.CLI
             Console.WriteLine("Success: " + outfilename);
         }
 
-        static async void UrlHashHandler(string url, ApiType apiType, InvocationContext ctx)
+        static async Task UrlHashHandler(string url, ApiType apiType, InvocationContext ctx)
         {
-            var caches = await CacheManager.LoadAllCaches(UserSettings.Instance.GameDirectory, LanguageNotDetectedPicker);
+            var caches = await CacheManager.LoadAllCaches(LanguageNotDetectedPicker);
             CacheManager cache = apiType switch
             {
                 ApiType.offline => caches.Offline,
                 ApiType.online => caches.Online,
                 ApiType.lan => caches.Lan,
-                _ => throw new ArgumentException()
+                _ => throw new ArgumentException(apiType.ToString())
             };
             var apiCall = cache.Api.CallUrl(url);
             if (apiCall == null)
@@ -302,7 +302,7 @@ namespace InfiniteVariantTool.CLI
 
             foreach (var variant in user == true ? manager.FilterUserVariants(filter) : manager.FilterVariants(filter))
             {
-                PrintMetadata(variant);
+                PrintVariant(variant);
             }
         }
 
@@ -330,7 +330,7 @@ namespace InfiniteVariantTool.CLI
                 Console.WriteLine("Error: multiple matching variants:");
                 foreach (var item in entries)
                 {
-                    PrintMetadata(item);
+                    PrintVariant(item);
                 }
                 ctx.ExitCode = 1;
             }
@@ -369,7 +369,7 @@ namespace InfiniteVariantTool.CLI
             foreach (var variant in manager.FilterVariants(filter))
             {
                 manager.SetVariantEnabled(variant, enabled);
-                PrintMetadata(variant);
+                PrintVariant(variant);
             }
             await manager.Flush();
         }
@@ -404,10 +404,10 @@ namespace InfiniteVariantTool.CLI
                 await VariantSetEnabled(filter, false);
             }
 
-        static void PrintMetadata(VariantAsset variant)
+        static void PrintVariant(VariantAsset variant)
         {
             Console.WriteLine(new string('-', 48));
-            Console.WriteLine("Type: " + variant.Type.ClassType);
+            Console.WriteLine("Type: " + variant.Type.ClassType.Name);
             Console.WriteLine("AssetId: " + variant.Variant.AssetId);
             Console.WriteLine("VersionId: " + variant.Variant.VersionId);
             Console.WriteLine("Name: " + variant.Variant.PublicName);

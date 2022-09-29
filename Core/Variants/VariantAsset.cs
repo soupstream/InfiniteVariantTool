@@ -86,7 +86,7 @@ namespace InfiniteVariantTool.Core.Variants
                         }
                         else if (extension == FileExtension.Xml)
                         {
-                            variant = (BondAsset)(await SchemaSerializer.DeserializeXmlAsync(variantFilePath, variantType));
+                            variant = (BondAsset)(await SchemaSerializer.SerializeXmlAsync(variantFilePath, variantType));
                         }
                         else if (extension == FileExtension.Bin)
                         {
@@ -130,9 +130,12 @@ namespace InfiniteVariantTool.Core.Variants
                 if (Files.ContainsKey(relativeFilePath))
                 {
                     string filePath = Path.Combine(directory, relativeFilePath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
                     await File.WriteAllBytesAsync(filePath, Files[relativeFilePath]);
                 }
             }
+
+            FilePath = variantFilePath;
         }
 
         // load attached files
@@ -183,14 +186,55 @@ namespace InfiniteVariantTool.Core.Variants
             ClassType = classType;
             EndpointId = endpointId;
         }
+
         public static VariantType FromClassType(Type type)
         {
             return VariantTypes.Find(variantType => variantType.ClassType == type) ?? throw new KeyNotFoundException();
         }
 
-        public static readonly VariantType MapVariant = new(typeof(MapVariant), "HIUGC_Discovery_GetUgcGameVariant");
-        public static readonly VariantType UgcGameVariant = new(typeof(UgcGameVariant), "HIUGC_Discovery_GetEngineGameVariant");
-        public static readonly VariantType EngineGameVariant = new(typeof(EngineGameVariant), "HIUGC_Discovery_GetMap");
+        public List<BondAsset> GetLinks(GameManifest manifest)
+        {
+            if (this == MapVariant)
+            {
+                return manifest.MapLinks;
+            }
+            else if (this == EngineGameVariant)
+            {
+                return manifest.EngineGameVariantLinks;
+            }
+            else if (this == UgcGameVariant)
+            {
+                return manifest.UgcGameVariantLinks;
+            }
+            else
+            {
+                throw new InvalidOperationException();
+            }
+        }
+
+        public List<BondAsset>? GetLinks(CustomsManifest manifest)
+        {
+            if (this == MapVariant)
+            {
+                return manifest.MapLinks;
+            }
+            else if (this == EngineGameVariant)
+            {
+                return null;
+            }
+            else if (this == UgcGameVariant)
+            {
+                return manifest.UgcGameVariantLinks;
+            }
+            else
+            {
+                throw new InvalidOperationException();
+            }
+        }
+
+        public static readonly VariantType MapVariant = new(typeof(MapVariant), "HIUGC_Discovery_GetMap");
+        public static readonly VariantType UgcGameVariant = new(typeof(UgcGameVariant), "HIUGC_Discovery_GetUgcGameVariant");
+        public static readonly VariantType EngineGameVariant = new(typeof(EngineGameVariant), "HIUGC_Discovery_GetEngineGameVariant");
         public static readonly List<VariantType> VariantTypes = new() { MapVariant, UgcGameVariant, EngineGameVariant };
     }
 }

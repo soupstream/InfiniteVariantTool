@@ -22,6 +22,12 @@ namespace InfiniteVariantTool.Tests
             TestLuaBundles(UserSettings.Instance.GameDirectory, Constants.OfflineCacheDirectory);
         }
 
+        [TestMethod]
+        public void TestOnlineLuaBundles()
+        {
+            TestLuaBundles(UserSettings.Instance.GameDirectory, Constants.OnlineCacheDirectory);
+        }
+
         public void TestLuaBundles(string baseDirectory, string cacheDirectory)
         {
             string fullCachePath = Path.Combine(baseDirectory, cacheDirectory);
@@ -54,7 +60,7 @@ namespace InfiniteVariantTool.Tests
                 {
                     if (LuaBundleUtils.IsLuaBundle(blob.Value))
                     {
-                        yield return (blob.Key, blob.Value);
+                        yield return (filename, blob.Value);
                     }
                 }
             }

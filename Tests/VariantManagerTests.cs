@@ -15,66 +15,74 @@ using System.Xml.Serialization;
 
 namespace InfiniteVariantTool.Tests
 {
-    /*
     [TestClass]
     public class VariantManagerTests
     {
         [TestMethod]
         public async Task TestVariantManager()
         {
+            string gameDir = UserSettings.Instance.GameDirectory;
             string outputDir = GetType().Name;
+            string userCacheDir = Path.Combine(outputDir, "usercache");
             if (Directory.Exists(outputDir))
             {
                 Directory.Delete(outputDir, true);
             }
-            Directory.CreateDirectory(Path.Combine(outputDir, VariantType.MapVariant.ToString()));
-            Directory.CreateDirectory(Path.Combine(outputDir, VariantType.UgcGameVariant.ToString()));
-            Directory.CreateDirectory(Path.Combine(outputDir, VariantType.EngineGameVariant.ToString()));
+            Directory.CreateDirectory(userCacheDir);
 
-            VariantManager manager = new(UserSettings.Instance.GameDirectory);
-            manager.LoadCache(() => "en-US");
-            FileNameDeduper deduper = new();
-            List<string> filenames = new();
-            bool unpackedLinkedVariant = false;
-            foreach (var entry in manager.GetVariantEntries(null, null, null, null, null))
+            // load variant manager
+            VariantManager manager = await VariantManager.Load(() => Language.En);
+
+            // enumerate entries and grab a variant
+            VariantAsset? fiestaEntry = null;
+            foreach (var variant in manager.FilterVariants(new()))
             {
-                var variant = await manager.GetVariant(entry.Metadata.AssetId, entry.Metadata.VersionId, entry.Type, entry.Metadata.PublicName, entry.Enabled, true, true, true, true);
-                string filename = Path.Combine(
-                    outputDir,
-                    variant.Type.ToString(),
-                    variant.Metadata.Base.PublicName.Replace(':', '_'));
-                filename = deduper.Dedupe(filename);
-                variant.Save(filename);
-                if (variant is UgcGameVariant ugcGameVariant && ugcGameVariant.LinkedEngineGameVariant != null)
+                if (variant.Variant.PublicName == "Fiesta:Slayer")
                 {
-                    unpackedLinkedVariant = true;
-                    foreach (var dir in Directory.GetDirectories(filename))
-                    {
-                        filenames.Add(dir);
-                    }
+                    fiestaEntry = variant;
                 }
-                else
-                {
-                    filenames.Add(filename);
-                }
+                PrintVariant(variant);
             }
+            Assert.IsNotNull(fiestaEntry);
 
-            manager.OnlineCache!.BasePath = Path.Combine(outputDir, Constants.OnlineCacheDirectory);
-            manager.LanCache!.BasePath = Path.Combine(outputDir, Constants.LanCacheDirectory);
-            Directory.CreateDirectory(Path.Combine(outputDir, Constants.OfflineCacheDirectory, "common", "other"));
-            Directory.CreateDirectory(Path.Combine(outputDir, Constants.OnlineCacheDirectory, "webcache"));
-            Directory.CreateDirectory(Path.Combine(outputDir, Constants.LanCacheDirectory, "webcache"));
+            // save a variant
+            VariantAsset fiestaVariant = await manager.GetVariant((Guid)fiestaEntry.Variant.AssetId, (Guid)fiestaEntry.Variant.VersionId, fiestaEntry.Type, true);
+            string fiestaVariantDir = Path.Combine(userCacheDir, "fiesta_slayer");
+            await fiestaVariant.Save(fiestaVariantDir);
 
-            foreach (var filename in filenames)
+            // load variant
+            string fiestaVariantFile = Path.Combine(fiestaVariantDir, "EngineGameVariant", "EngineGameVariant.json");
+            await VariantAsset.Load(fiestaVariant.FilePath!, true);
+
+            // store variant
+            string fakeGameDir = Path.Combine(outputDir, "game");
+            Directory.CreateDirectory(Path.Combine(fakeGameDir, "disk_cache", "webcache"));
+            Directory.CreateDirectory(Path.Combine(fakeGameDir, "server_disk_cache", "webcache"));
+            Directory.CreateDirectory(Path.Combine(fakeGameDir, "package", "pc", "common", "other"));
+            Directory.CreateDirectory(Path.Combine(fakeGameDir, "package", "pc", "en-US", "other"));
+            VariantManager manager2 = await VariantManager.Load(fakeGameDir, userCacheDir, manager.OfflineCache.BuildNumber, () => Language.En);
+            await manager2.StoreVariant(fiestaVariant);
+            manager2.SetVariantEnabled(fiestaVariant, false);
+            manager2.SetVariantEnabled(fiestaVariant, true);
+            await manager2.Flush();
+
+            // remove variant
+            await manager2.RemoveVariant(fiestaVariant);
+            await manager2.Flush();
+        }
+
+        static void PrintVariant(VariantAsset variant)
+        {
+            Console.WriteLine(new string('-', 48));
+            Console.WriteLine("Type: " + variant.Type.ClassType.Name);
+            Console.WriteLine("AssetId: " + variant.Variant.AssetId);
+            Console.WriteLine("VersionId: " + variant.Variant.VersionId);
+            Console.WriteLine("Name: " + variant.Variant.PublicName);
+            Console.WriteLine("Description: " + variant.Variant.Description);
+            if (variant.Enabled != null)
             {
-                var variant = Variant.Load(filename);
-                manager.SaveVariant(variant);
+                Console.WriteLine("Enabled: " + variant.Enabled);
             }
-
-            await manager.Save();
-
-            Assert.IsTrue(unpackedLinkedVariant);
         }
     }
-    */
 }

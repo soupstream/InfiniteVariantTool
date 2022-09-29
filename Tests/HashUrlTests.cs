@@ -20,7 +20,7 @@ namespace InfiniteVariantTool.Tests
         CacheManager.CacheGroup caches;
         public HashUrlTests()
         {
-            caches = CacheManager.LoadAllCaches(UserSettings.Instance.GameDirectory, () => Language.En).Result;
+            caches = CacheManager.LoadAllCaches(() => Language.En).Result;
         }
 
         [TestMethod]
@@ -29,6 +29,14 @@ namespace InfiniteVariantTool.Tests
             string url = "https://blobs-infiniteugc-test.test.svc.halowaypoint.com/ugcstorage/map/4f196016-0101-4844-8358-2504f7c44656/6e5ad39c-7280-4058-9f09-1825d942f48e/images/screenshot1.png";
             ulong hash = caches.Offline.Api.CallUrl(url)!.Hash;
             Assert.AreEqual(hash, 3063513848438510U);
+        }
+
+        [TestMethod]
+        public void TestDiscoveryUrl()
+        {
+            string url = "https://discovery-infiniteugc-intone.test.svc.halowaypoint.com/hi/engineGameVariants/bbe3163a-8eb1-4611-8b62-c132e91118fc/versions/66cae36b-d42d-48c8-a455-aeac6dedb893";
+            ulong hash = caches.Offline.Api.CallUrl(url)!.Hash;
+            Assert.AreEqual(hash, 17779617441512810129);
         }
 
         [TestMethod]
@@ -81,25 +89,19 @@ namespace InfiniteVariantTool.Tests
         }
 
         [TestMethod]
-        public void TestCacheMaps()
+        public void TestCacheFileMetadata()
         {
             string cacheDirectory = Path.Combine(UserSettings.Instance.GameDirectory, Constants.OfflineCacheDirectory);
-            foreach (string filename in TestUtil.GatherCacheMapFiles(cacheDirectory))
+            foreach ((string filename, byte[] data) in TestUtil.GatherCacheFiles(cacheDirectory, true, true, false))
             {
-                Console.WriteLine(filename);
-                TestCacheMap(filename);
-            }
-        }
-
-        private void TestCacheMap(string filename)
-        {
-            CacheMap cm = SchemaSerializer.DeserializeBond<CacheMap>(File.ReadAllBytes(filename));
-            foreach (var entry in cm.Entries)
-            {
-                if (entry.Value.Metadata.Url != null)
+                CacheFile cacheFile = SchemaSerializer.DeserializeBond<CacheFile>(data);
+                if (cacheFile.Metadata != null && cacheFile.Metadata.Url != "")
                 {
-                    ulong? hash = caches.Offline.Api.CallUrl(entry.Value.Metadata.Url)!.Hash;
-                    Assert.AreEqual(entry.Key, hash);
+                    ulong expectedHash = ulong.Parse(Path.GetFileName(filename));
+                    string url = cacheFile.Metadata.Url;
+                    ulong myHash = caches.Offline.Api.CallUrl(url)!.Hash;
+                    Console.WriteLine(url + " => " + myHash);
+                    Assert.AreEqual(expectedHash, myHash, url);
                 }
             }
         }

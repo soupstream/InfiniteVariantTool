@@ -14,42 +14,48 @@ namespace InfiniteVariantTool.Tests
 {
     class TestUtil
     {
-        public static IEnumerable<(string, byte[])> GatherCacheFiles(string dir, bool verbose = false, bool skipNonBond = true)
+        public static IEnumerable<(string, byte[])> GatherCacheFiles(string dir, bool verbose = false, bool skipNonBond = true, bool includeGamecms = true)
         {
             foreach (string f in Directory.GetFiles(dir))
             {
-                byte[] data = File.ReadAllBytes(f);
                 bool skip = false;
 
-                if (f.EndsWith(".xml"))
+                string fileExt = Path.GetExtension(f);
+                if (fileExt is not "" or ".bin")
                 {
                     skip = true;
                     if (verbose)
                     {
-                        Console.WriteLine("Skipping .xml file: " + f);
+                        Console.WriteLine($"Skipping {fileExt} file: {f}");
                     }
                 }
-
-                if (skipNonBond)
+                else
                 {
-                    FileExtension ext = FileUtil.DetectFileType(data);
-                    if (ext != FileExtension.Bin)
+                    byte[] data = File.ReadAllBytes(f);
+                    if (skipNonBond)
                     {
-                        Console.WriteLine("Skipping " + ext.Value + " file: " + f);
-                        skip = true;
+                        FileExtension ext = FileUtil.DetectFileType(data);
+                        if (ext != FileExtension.Bin)
+                        {
+                            Console.WriteLine($"Skipping {ext.Value} file: {f}");
+                            skip = true;
+                        }
                     }
-                }
 
-                if (!skip)
-                {
-                    yield return (f, data);
+                    if (!skip)
+                    {
+                        yield return (f, data);
+                    }
                 }
             }
             foreach (string d in Directory.GetDirectories(dir))
             {
-                foreach ((string, byte[]) f in GatherCacheFiles(d, verbose, skipNonBond))
+                if (!(d.EndsWith("gamecms") || d.EndsWith("gamecmscache")) || includeGamecms)
                 {
-                    yield return f;
+                    foreach ((string, byte[]) f in GatherCacheFiles(d, verbose, skipNonBond, includeGamecms))
+                    {
+                        yield return f;
+                    }
                 }
             }
         }

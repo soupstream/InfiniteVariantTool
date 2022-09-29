@@ -36,7 +36,7 @@ namespace InfiniteVariantTool.Core.BondSchema
             [Bond.Id(0)]
             public SubsetData_ SubsetData { get; set; }
             [Bond.Id(1)]
-            public LocalizedData_ LocalizedData { get; set; }
+            public Dictionary<string, string> LocalizedData { get; set; }
 
             public CustomData_()
             {
@@ -60,11 +60,6 @@ namespace InfiniteVariantTool.Core.BondSchema
                 EngineName = "";
                 VariantName = "";
             }
-        }
-
-        [Bond.Schema]
-        public class LocalizedData_
-        {
         }
 
         #endregion

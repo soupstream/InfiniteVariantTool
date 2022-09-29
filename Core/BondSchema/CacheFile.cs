@@ -25,5 +25,11 @@ namespace InfiniteVariantTool.Core.BondSchema
         }
 
         #endregion
+
+        #region MyExtensions
+
+        public byte[] UData => (byte[])(Array)Data;
+
+        #endregion
     }
 }

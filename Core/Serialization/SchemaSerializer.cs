@@ -75,14 +75,14 @@ namespace InfiniteVariantTool.Core.Serialization
             return JsonSerializer.Serialize(src, src.GetType(), jsonOptions);
         }
 
-        public static T DeserializeXml<T>(XElement doc)
+        public static T SerializeXml<T>(XElement doc)
         {
             BondWriter bw = new(doc);
             byte[] packed = bw.Write();
             return DeserializeBond<T>(packed);
         }
 
-        public static async Task<object> DeserializeXmlAsync(string filePath, Type type)
+        public static async Task<object> SerializeXmlAsync(string filePath, Type type)
         {
             using var stream = File.OpenRead(filePath);
             XDocument doc = await XDocument.LoadAsync(stream, LoadOptions.None, new CancellationTokenSource().Token);
@@ -91,6 +91,12 @@ namespace InfiniteVariantTool.Core.Serialization
             var reader = new CompactBinaryReader<InputBuffer>(input, 2);
             var deserializer = new Bond.Deserializer<CompactBinaryReader<InputBuffer>>(type);
             return deserializer.Deserialize(reader);
+        }
+
+        public static BondReadResult DeserializeXml(byte[] data)
+        {
+            BondReader br = new(data);
+            return br.Read();
         }
     }
 }

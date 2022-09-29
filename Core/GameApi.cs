@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using InfiniteVariantTool.Core.BondSchema;
+using InfiniteVariantTool.Core.Variants;
 using static InfiniteVariantTool.Core.BondSchema.ApiManifest;
 
 namespace InfiniteVariantTool.Core
@@ -16,8 +17,17 @@ namespace InfiniteVariantTool.Core
         public GameApi(ApiManifest apiManifest)
         {
             EndpointMap = new();
+            Authority? openDiscoveryAuthority = null;
+
+            // missing from offline manifest
+            if (apiManifest.Endpoints.TryGetValue("HIUGC_Discovery_GetTagsInfo", out var tagsInfoEndpoint) && tagsInfoEndpoint.QueryString == "")
+            {
+                tagsInfoEndpoint.QueryString = "?flight={flightId}";
+            }
+
             foreach ((string endpointId, Endpoint endpoint) in apiManifest.Endpoints)
             {
+                // handle special cases
                 if (endpoint.AuthorityId is "iUgcFiles" or "iUgcSessionFiles")
                 {
                     endpoint.EndpointId = endpoint.AuthorityId;
@@ -34,10 +44,28 @@ namespace InfiniteVariantTool.Core
                 {
                     endpoint.Path = "{path}";
                 }
+                if (endpoint.AuthorityId == "HIUGC_Discovery_Authority" && VariantType.VariantTypes.Any(type => type.EndpointId == endpointId))
+                {
+                    // offline manifest seems to be missing HIUGC_Discovery_Authority_Open authority so variants are hashed wrong
+                    if (openDiscoveryAuthority == null)
+                    {
+                        // create authority and add it to api manifest
+                        openDiscoveryAuthority = new(apiManifest.Authorities["HIUGC_Discovery_Authority"]);
+                        openDiscoveryAuthority.AuthorityId = "HIUGC_Discovery_Authority_Open";
+                        openDiscoveryAuthority.AuthenticationMethods.Add(0);
+                        apiManifest.Authorities["HIUGC_Discovery_Authority_Open"] = openDiscoveryAuthority;
+                    }
+                    endpoint.AuthorityId = "HIUGC_Discovery_Authority_Open";
+                }
+
                 Authority authority = apiManifest.Authorities[endpoint.AuthorityId];
                 RetryPolicy retryPolicy = apiManifest.RetryPolicies[endpoint.RetryPolicyId];
                 ApiEndpoint apiEndpoint = new(endpoint, authority, retryPolicy);
                 EndpointMap[endpointId] = apiEndpoint;
+                if (endpointId != endpoint.EndpointId)
+                {
+                    EndpointMap[endpoint.EndpointId] = apiEndpoint;
+                }
             }
         }
 

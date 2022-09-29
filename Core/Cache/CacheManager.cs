@@ -2,6 +2,7 @@
 using Bond.Protocols;
 using InfiniteVariantTool.Core.BondSchema;
 using InfiniteVariantTool.Core.Serialization;
+using InfiniteVariantTool.Core.Settings;
 using InfiniteVariantTool.Core.Utils;
 using InfiniteVariantTool.Core.Variants;
 using System;
@@ -20,14 +21,13 @@ namespace InfiniteVariantTool.Core.Cache
 {
     public class CacheManager
     {
-        string directory;
         bool localized;
-        string buildNumber;
         HttpClient client;
         string cacheMapPath;
-        ApiCall apiManifestApiCall;
-        ApiCall gameManifestApiCall;
-        ApiCall customsManifestApiCall;
+
+        public ApiCall ApiManifestApiCall { get; private set; }
+        public ApiCall GameManifestApiCall { get; private set; }
+        public ApiCall CustomsManifestApiCall { get; private set; }
 
         public GameApi Api { get; private set; }
         public CustomsManifest CustomsManifest { get; private set; }
@@ -35,17 +35,36 @@ namespace InfiniteVariantTool.Core.Cache
         public CacheMap CacheMap { get; private set; }
 
         public Language? Language { get; private set; }
+        public string BuildNumber { get; private set; }
+        public string Directory { get; private set; }
+        public IEnumerable<string> Directories
+        {
+            get
+            {
+                if (localized)
+                {
+                    foreach (string subdir in new string[] { Language!.Code, "common" })
+                    {
+                        yield return string.Format(Directory, subdir);
+                    }
+                }
+                else
+                {
+                    yield return Directory;
+                }
+            }
+        }
 
         #region Construction
 
         private CacheManager(string directory)
         {
-            this.directory = directory;
+            this.Directory = directory;
             cacheMapPath = Path.Combine(directory, "CacheMap.wcache");
 
             // initialize with default values
             localized = false;
-            buildNumber = "";
+            BuildNumber = "";
             Api = new();
 
             client = new();
@@ -57,9 +76,9 @@ namespace InfiniteVariantTool.Core.Cache
             CacheMap = null!;
             CustomsManifest = null!;
             GameManifest = null!;
-            apiManifestApiCall = null!;
-            gameManifestApiCall = null!;
-            customsManifestApiCall = null!;
+            ApiManifestApiCall = null!;
+            GameManifestApiCall = null!;
+            CustomsManifestApiCall = null!;
         }
 
         private async Task LoadManifests(string apiManifestUrl, string gameManifestEndpointId, string customsManifestEndpointId, Dictionary<string, string> parameters)
@@ -77,12 +96,12 @@ namespace InfiniteVariantTool.Core.Cache
                     CacheMap.Language = Language.Code;
                 }
             }
-            apiManifestApiCall = Api.CallUrl(apiManifestUrl) ?? throw new Exception("invalid api manifest url: " + apiManifestUrl);
-            Api = new(await GetBondFile<ApiManifest>(apiManifestApiCall));
-            gameManifestApiCall = Api.Call(gameManifestEndpointId, parameters);
-            customsManifestApiCall = Api.Call(customsManifestEndpointId, parameters);
-            GameManifest = await TryGetCachedBondFile<GameManifest>(gameManifestApiCall) ?? new();
-            CustomsManifest = await TryGetCachedBondFile<CustomsManifest>(customsManifestApiCall) ?? new();
+            ApiManifestApiCall = Api.CallUrl(apiManifestUrl) ?? throw new Exception("invalid api manifest url: " + apiManifestUrl);
+            Api = new(await GetBondFile<ApiManifest>(ApiManifestApiCall));
+            GameManifestApiCall = Api.Call(gameManifestEndpointId, parameters);
+            CustomsManifestApiCall = Api.Call(customsManifestEndpointId, parameters);
+            GameManifest = await TryGetCachedBondFile<GameManifest>(GameManifestApiCall) ?? new();
+            CustomsManifest = await TryGetCachedBondFile<CustomsManifest>(CustomsManifestApiCall) ?? new();
         }
 
         public static async Task<CacheManager> LoadOnlineCache(string gameDir, string buildNumber)
@@ -133,9 +152,16 @@ namespace InfiniteVariantTool.Core.Cache
             CacheManager Offline,
             CacheManager Lan);
 
-        public static async Task<CacheGroup> LoadAllCaches(string gameDir, Func<Language> languagePicker)
+        // load with user settings
+        public static async Task<CacheGroup> LoadAllCaches(Func<Language> languagePicker)
         {
+            string gameDir = UserSettings.Instance.GameDirectory;
             string buildNumber = FileUtil.GetBuildNumber(gameDir);
+            return await LoadAllCaches(gameDir, buildNumber, languagePicker);
+        }
+
+        public static async Task<CacheGroup> LoadAllCaches(string gameDir, string buildNumber, Func<Language> languagePicker)
+        {
             CacheManager onlineCache = await LoadOnlineCache(gameDir, buildNumber);
             CacheManager lanCache = await LoadLanCache(gameDir, buildNumber);
             Language language = onlineCache.Language ?? lanCache.Language ?? languagePicker();
@@ -148,6 +174,10 @@ namespace InfiniteVariantTool.Core.Cache
         #endregion
 
         #region URLs
+        public ApiCall GetDiscoveryApiCall(BondAsset asset, VariantType type)
+        {
+            return GetDiscoveryApiCall((Guid)asset.AssetId, (Guid)asset.VersionId, type);
+        }
 
         public ApiCall GetDiscoveryApiCall(Guid assetId, Guid versionId, VariantType type)
         {
@@ -184,9 +214,9 @@ namespace InfiniteVariantTool.Core.Cache
             if (localized)
             {
                 // localized cache is currently missing CacheMap.wcache so don't check it
-                foreach (string subdir in new string[] { Language!.Code, "common" })
+                foreach (string dir in Directories)
                 {
-                    filePath = Path.Combine(string.Format(directory, subdir), hash.ToString());
+                    filePath = Path.Combine(dir, hash.ToString());
                     if (File.Exists(filePath))
                     {
                         return true;
@@ -197,12 +227,26 @@ namespace InfiniteVariantTool.Core.Cache
             }
             else
             {
-                filePath = Path.Combine(directory, hash.ToString());
+                filePath = Path.Combine(Directory, hash.ToString());
                 return CacheMap.Entries.ContainsKey(hash)
                     && CacheMap.Entries[hash].Metadata.Headers.TryGetValue("Content-Type", out string? cachedContentType)
                     && cachedContentType == mimeType.Value
                     && File.Exists(filePath);
             }
+        }
+
+        public string? GetFilePathIfExists(ApiCall apiCall)
+        {
+            string hash = apiCall.Hash.ToString();
+            foreach (string subdir in Directories)
+            {
+                string filePath = Path.Combine(subdir, hash);
+                if (File.Exists(filePath))
+                {
+                    return filePath;
+                }
+            }
+            return null;
         }
 
         public async Task<T> GetBondFile<T>(ApiCall apiCall)
@@ -228,7 +272,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             ApiManifest.RetryPolicy retryPolicy = apiCall.ApiEndpoint.RetryPolicy;
             string url = apiCall.Url;
-            client.Timeout = TimeSpan.FromMilliseconds(retryPolicy.TimeoutMs);
+            //client.Timeout = TimeSpan.FromMilliseconds(retryPolicy.TimeoutMs);
             int retriesLeft = retryPolicy.RetryOptions?.MaxRetryCount ?? 0;
             float retryDelay = retryPolicy.RetryOptions?.RetryDelayMs ?? 0;
             Random random = new();
@@ -242,7 +286,7 @@ namespace InfiniteVariantTool.Core.Cache
                     {
                         req.Headers.Add("Accept-Language", Language.Code);
                     }
-                    req.Headers.Add("User-Agent", $"SHIVA-2043073184/{buildNumber}.0 (release; PC)");
+                    req.Headers.Add("User-Agent", $"SHIVA-2043073184/{BuildNumber}.0 (release; PC)");
                     var res = await client.SendAsync(req);
                     res.EnsureSuccessStatusCode();
                     byte[] content = await res.Content.ReadAsByteArrayAsync();
@@ -280,7 +324,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             if (localized)
             {
-                throw new NotImplementedException();
+                return;
             }
 
             // write file with metadata
@@ -297,7 +341,7 @@ namespace InfiniteVariantTool.Core.Cache
                 Data = (sbyte[])(Array)data
             };
             ulong hash = apiCall.Hash;
-            string filePath = Path.Combine(directory, hash.ToString());
+            string filePath = Path.Combine(Directory, hash.ToString());
             await File.WriteAllBytesAsync(filePath, SchemaSerializer.SerializeBond(cacheFile));
 
             // add entry to cache map
@@ -322,7 +366,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             if (localized)
             {
-                throw new NotImplementedException();
+                return;
             }
 
             var hash = apiCall.Hash;
@@ -330,7 +374,7 @@ namespace InfiniteVariantTool.Core.Cache
             {
                 CacheMap.Entries.Remove(hash);
             }
-            string filePath = Path.Combine(directory, hash.ToString());
+            string filePath = Path.Combine(Directory, hash.ToString());
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
@@ -340,8 +384,13 @@ namespace InfiniteVariantTool.Core.Cache
         // write cachemap and manifests to disk
         public async Task Flush()
         {
-            await StoreBondFile(GameManifest, gameManifestApiCall);
-            await StoreBondFile(CustomsManifest, customsManifestApiCall);
+            if (localized)
+            {
+                return;
+            }
+
+            await StoreBondFile(GameManifest, GameManifestApiCall);
+            await StoreBondFile(CustomsManifest, CustomsManifestApiCall);
             await File.WriteAllBytesAsync(cacheMapPath, SchemaSerializer.SerializeBond(CacheMap));
         }
 

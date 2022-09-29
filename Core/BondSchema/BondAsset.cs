@@ -98,7 +98,7 @@ namespace InfiniteVariantTool.Core.BondSchema
             public long Favorites { get; set; }
             [Bond.Id(3)]
             public long Likes { get; set; }
-            [Bond.Id(4)]
+            [Bond.Id(9)]
             public long Bookmarks { get; set; }
             [Bond.Id(20)]
             public long ParentAssetCount { get; set; }
@@ -138,6 +138,11 @@ namespace InfiniteVariantTool.Core.BondSchema
         public bool GuidsEqual(BondAsset other)
         {
             return AssetId.Equals(other.AssetId) && VersionId.Equals(other.VersionId);
+        }
+
+        public bool AssetIdEqual(BondAsset other)
+        {
+            return AssetId.Equals(other.AssetId);
         }
 
         public void SetGuids(Guid? assetId, Guid? versionId)
