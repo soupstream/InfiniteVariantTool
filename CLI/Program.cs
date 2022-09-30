@@ -28,15 +28,13 @@ namespace InfiniteVariantTool.CLI
                 {
                     new Command("unpack", "Unpack a bond file")
                     {
-                        new Argument<FileInfo>("filename", "Cache file to unpack"),
+                        new Argument<FileInfo>("filename", "Bond file to unpack"),
                         new Option<FileInfo?>(new string[] { "--output", "-o" }, "Output file name"),
-                        new Option<bool?>(new string[] { "--embedded", "-e" }, "Unpack embedded bond content"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        (FileInfo infile, FileInfo? outfile, bool? unpackEmbedded, InvocationContext ctx) => CacheFileUnpackHandler(infile, outfile, unpackEmbedded, ctx),
+                        (FileInfo infile, FileInfo? outfile, InvocationContext ctx) => CacheFileUnpackHandler(infile, outfile, true, ctx),
                         cmd.Arguments[0],
-                        cmd.Options[0],
-                        cmd.Options[1])),
+                        cmd.Options[0])),
 
                     new Command("pack", "Pack a bond file")
                     {
@@ -93,13 +91,13 @@ namespace InfiniteVariantTool.CLI
                     {
                         new Option<Guid?>("--asset-id", "Asset ID of variant"),
                         new Option<Guid?>("--version-id", "Version ID of variant"),
-                        new Option<VariantType?>("--type", "Type of variant"),
+                        new Option<VariantTypeEnum?>("--type", "Type of variant"),
                         new Option<string?>("--name", "Name of variant"),
                         new Option<bool?>("--enabled", "Whether the variant is enabled"),
                         new Option<bool?>("--user", "Show only user-installed variants"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled, bool? user) =>
+                        async (Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled, bool? user) =>
                             await VariantListHandler(assetId, versionId, variantType, name, enabled, user),
                         cmd.Options[0],
                         cmd.Options[1],
@@ -111,17 +109,16 @@ namespace InfiniteVariantTool.CLI
                     {
                         new Option<Guid?>("--asset-id", "Asset ID of variant"),
                         new Option<Guid?>("--version-id", "Version ID of variant"),
-                        new Option<VariantType?>("--type", "Type of variant"),
+                        new Option<VariantTypeEnum?>("--type", "Type of variant"),
                         new Option<string?>("--name", "Name of variant"),
                         new Option<bool?>("--enabled", "Whether the variant is enabled"),
                         new Option<bool>("--generate-guids", "Generate a new asset ID and version ID"),
-                        new Option<bool>("--download-lua", "Download debug script source if available"),
                         new Option<bool>("--extract-linked", "Also extract linked variants"),
                         new Option<string?>(new string[] { "--output", "-o" }, "Output directory name"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled, bool generateGuids, bool downloadLua, bool extractLinked, string outputDir, InvocationContext ctx) =>
-                            await VariantExtractHandler(assetId, versionId, variantType, name, enabled, generateGuids, downloadLua, extractLinked, outputDir, ctx),
+                        async (Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled, bool generateGuids, bool extractLinked, string outputDir, InvocationContext ctx) =>
+                            await VariantExtractHandler(assetId, versionId, variantType, name, enabled, generateGuids, extractLinked, outputDir, ctx),
                         cmd.Options[0],
                         cmd.Options[1],
                         cmd.Options[2],
@@ -129,27 +126,26 @@ namespace InfiniteVariantTool.CLI
                         cmd.Options[4],
                         cmd.Options[5],
                         cmd.Options[6],
-                        cmd.Options[7],
-                        cmd.Options[8])),
+                        cmd.Options[7])),
                     new Command("install", "Install a variant")
                     {
                         new Option<bool>("--enable", "Also add the variant to the Custom Games menu"),
-                        new Argument<string>("variant-dir", "Variant directory name")
+                        new Argument<string>("variant-file", "Variant json file")
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (bool enable, string variantDir) => await VariantInstallHandler(enable, variantDir),
+                        async (bool enable, string variantFile) => await VariantInstallHandler(enable, variantFile),
                         cmd.Options[0],
                         cmd.Arguments[0])),
                     new Command("enable", "Add a variant to the Custom Games menu")
                     {
                         new Option<Guid?>("--asset-id", "Asset ID of variant"),
                         new Option<Guid?>("--version-id", "Version ID of variant"),
-                        new Option<VariantType?>("--type", "Type of variant"),
+                        new Option<VariantTypeEnum?>("--type", "Type of variant"),
                         new Option<string?>("--name", "Name of variant"),
                         new Option<bool?>("--enabled", "Whether the variant is enabled"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled) =>
+                        async (Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled) =>
                             await VariantEnableHandler(assetId, versionId, variantType, name, enabled),
                         cmd.Options[0],
                         cmd.Options[1],
@@ -160,12 +156,12 @@ namespace InfiniteVariantTool.CLI
                     {
                         new Option<Guid?>("--asset-id", "Asset ID of variant"),
                         new Option<Guid?>("--version-id", "Version ID of variant"),
-                        new Option<VariantType?>("--type", "Type of variant"),
+                        new Option<VariantTypeEnum?>("--type", "Type of variant"),
                         new Option<string?>("--name", "Name of variant"),
                         new Option<bool?>("--enabled", "Whether the variant is enabled"),
                     }
                     .Also(cmd => cmd.SetHandler(
-                        async (Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled) =>
+                        async (Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled) =>
                             await VariantDisableHandler(assetId, versionId, variantType, name, enabled),
                         cmd.Options[0],
                         cmd.Options[1],
@@ -288,7 +284,7 @@ namespace InfiniteVariantTool.CLI
             }
         }
 
-        static async Task VariantListHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled, bool? user)
+        static async Task VariantListHandler(Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled, bool? user)
         {
             VariantManager manager = await VariantManager.Load(LanguageNotDetectedPicker);
             VariantFilter filter = new()
@@ -297,7 +293,7 @@ namespace InfiniteVariantTool.CLI
                 VersionId = versionId,
                 Name = name,
                 Enabled = enabled,
-                Type = variantType
+                Type = VariantType.FromEnum(variantType)
             };
 
             foreach (var variant in user == true ? manager.FilterUserVariants(filter) : manager.FilterVariants(filter))
@@ -306,8 +302,8 @@ namespace InfiniteVariantTool.CLI
             }
         }
 
-        static async Task VariantExtractHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled,
-            bool generateGuids, bool downloadLua, bool unpackLinked, string? outputDir, InvocationContext ctx)
+        static async Task VariantExtractHandler(Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled,
+            bool generateGuids, bool unpackLinked, string? outputDir, InvocationContext ctx)
         {
             VariantManager manager = await VariantManager.Load(LanguageNotDetectedPicker);
             VariantFilter filter = new()
@@ -316,7 +312,7 @@ namespace InfiniteVariantTool.CLI
                 VersionId = versionId,
                 Name = name,
                 Enabled = enabled,
-                Type = variantType
+                Type = VariantType.FromEnum(variantType)
             };
 
             var entries = manager.FilterVariants(filter);
@@ -347,6 +343,7 @@ namespace InfiniteVariantTool.CLI
                     outputDir = FileUtil.MakeValidFilename(variant.Variant.PublicName);
                 }
                 await variant.Save(outputDir);
+                await manager.Flush();
                 Console.WriteLine("Success: " + outputDir);
             }
         }
@@ -374,7 +371,7 @@ namespace InfiniteVariantTool.CLI
             await manager.Flush();
         }
 
-        static async Task VariantEnableHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
+        static async Task VariantEnableHandler(Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled)
         {
             VariantFilter filter = new()
             {
@@ -382,14 +379,14 @@ namespace InfiniteVariantTool.CLI
                 VersionId = versionId,
                 Name = name,
                 Enabled = enabled,
-                Type = variantType
+                Type = VariantType.FromEnum(variantType)
             };
 
             Console.WriteLine("Enabled the following variants:");
             await VariantSetEnabled(filter, true);
         }
 
-        static async Task VariantDisableHandler(Guid? assetId, Guid? versionId, VariantType? variantType, string? name, bool? enabled)
+        static async Task VariantDisableHandler(Guid? assetId, Guid? versionId, VariantTypeEnum? variantType, string? name, bool? enabled)
         {
                 VariantFilter filter = new()
                 {
@@ -397,7 +394,7 @@ namespace InfiniteVariantTool.CLI
                     VersionId = versionId,
                     Name = name,
                     Enabled = enabled,
-                    Type = variantType
+                    Type = VariantType.FromEnum(variantType)
                 };
 
                 Console.WriteLine("Disabled the following variants:");

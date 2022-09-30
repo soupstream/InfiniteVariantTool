@@ -528,6 +528,7 @@ namespace InfiniteVariantTool.Core
 
         public static string SuggestPackFilename(string filename)
         {
+            filename = Path.TrimEndingDirectorySeparator(filename);
             if (filename.EndsWith("_lua"))
             {
                 filename = filename[..^4];

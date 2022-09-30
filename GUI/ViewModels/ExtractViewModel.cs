@@ -31,7 +31,7 @@ namespace InfiniteVariantTool.GUI
             }
         }
 
-        public bool IsUgcGameVariant => variant.Type == VariantType.UgcGameVariant;
+        public bool IsUgcGameVariant => variant.Type == VariantType.UgcGameVariant.EnumValue;
 
         private string outputDirectory = "";
         public string OutputDirectory
@@ -104,7 +104,7 @@ namespace InfiniteVariantTool.GUI
             string outputDirectory = OutputDirectory == "" ? DefaultOutputDirectory : OutputDirectory;
             try
             {
-                var loadedVariant = await variantManager.GetVariant(variant.AssetId, variant.VersionId, variant.Type, true, extractEngineGameVariant);
+                var loadedVariant = await variantManager.GetVariant(variant.AssetId, variant.VersionId, VariantType.FromEnum(variant.Type), true, extractEngineGameVariant);
                 loadedVariant.GenerateGuids(GenerateNewAssetId, GenerateNewVersionId);
                 await loadedVariant.Save(outputDirectory);
                 await variantManager.Flush();

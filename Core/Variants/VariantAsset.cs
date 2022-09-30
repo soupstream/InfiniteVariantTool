@@ -185,20 +185,38 @@ namespace InfiniteVariantTool.Core.Variants
     {
     }
 
+    public enum VariantTypeEnum
+    {
+        UGC,
+        Engine,
+        Map
+    }
     public class VariantType
     {
         public readonly Type ClassType;
         public readonly string EndpointId;
+        public readonly VariantTypeEnum EnumValue;
         public string Name => ClassType.Name;
-        private VariantType(Type classType, string endpointId)
+        private VariantType(Type classType, string endpointId, VariantTypeEnum enumValue)
         {
             ClassType = classType;
             EndpointId = endpointId;
+            EnumValue = enumValue;
         }
 
         public static VariantType FromClassType(Type type)
         {
             return VariantTypes.Find(variantType => variantType.ClassType == type) ?? throw new KeyNotFoundException();
+        }
+
+        public static VariantType FromEnum(VariantTypeEnum enumValue)
+        {
+            return VariantTypes.Find(variantType => variantType.EnumValue == enumValue) ?? throw new KeyNotFoundException();
+        }
+
+        public static VariantType? FromEnum(VariantTypeEnum? enumValue)
+        {
+            return VariantTypes.Find(variantType => variantType.EnumValue == enumValue);
         }
 
         public List<BondAsset> GetLinks(GameManifest manifest)
@@ -221,7 +239,7 @@ namespace InfiniteVariantTool.Core.Variants
             }
         }
 
-        public List<BondAsset> GetLinks(CustomsManifest manifest)
+        public List<BondAsset>? GetLinks(CustomsManifest manifest)
         {
             if (this == MapVariant)
             {
@@ -241,9 +259,9 @@ namespace InfiniteVariantTool.Core.Variants
             }
         }
 
-        public static readonly VariantType MapVariant = new(typeof(MapVariant), "HIUGC_Discovery_GetMap");
-        public static readonly VariantType UgcGameVariant = new(typeof(UgcGameVariant), "HIUGC_Discovery_GetUgcGameVariant");
-        public static readonly VariantType EngineGameVariant = new(typeof(EngineGameVariant), "HIUGC_Discovery_GetEngineGameVariant");
+        public static readonly VariantType MapVariant = new(typeof(MapVariant), "HIUGC_Discovery_GetMap", VariantTypeEnum.Map);
+        public static readonly VariantType UgcGameVariant = new(typeof(UgcGameVariant), "HIUGC_Discovery_GetUgcGameVariant", VariantTypeEnum.UGC);
+        public static readonly VariantType EngineGameVariant = new(typeof(EngineGameVariant), "HIUGC_Discovery_GetEngineGameVariant", VariantTypeEnum.Engine);
         public static readonly List<VariantType> VariantTypes = new() { MapVariant, UgcGameVariant, EngineGameVariant };
     }
 }

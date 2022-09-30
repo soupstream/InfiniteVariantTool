@@ -118,9 +118,9 @@ namespace InfiniteVariantTool.Core.Cache
         {
             foreach (var type in VariantType.VariantTypes)
             {
-                if (type != VariantType.EngineGameVariant)
+                var customsManifestLinks = type.GetLinks(CustomsManifest);
+                if (customsManifestLinks != null)
                 {
-                    var customsManifestLinks = type.GetLinks(CustomsManifest);
                     var gameManifestLinks = type.GetLinks(GameManifest);
 
                     var customsManifestLinkMap = customsManifestLinks.ToDictionary(

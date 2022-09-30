@@ -24,7 +24,7 @@ namespace InfiniteVariantTool.GUI
             enabled = entry.Enabled;
             assetId = (Guid)entry.Variant.AssetId;
             versionId = (Guid)entry.Variant.VersionId;
-            Type = entry.Type;
+            Type = entry.Type.EnumValue;
             Filename = entry.FilePath;
             IsUserVariant = isUserVariant;
         }
@@ -116,12 +116,7 @@ namespace InfiniteVariantTool.GUI
             }
         }
 
-        public VariantType Type { get; set; }
-        public string TypeStr
-        {
-            get => Type.Name;
-            set => throw new InvalidOperationException();
-        }
+        public VariantTypeEnum Type { get; set; }
         public string? Filename { get; set; }
         public bool IsUserVariant { get; set; }
     }

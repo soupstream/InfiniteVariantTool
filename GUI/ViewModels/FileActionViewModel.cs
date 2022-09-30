@@ -25,6 +25,8 @@ namespace InfiniteVariantTool.GUI
         public override void FileAction(string inputFilename, string outputFilename)
         {
             BondReader br = new(inputFilename);
+            var result = br.Read();
+            result.ReadEmbeddedBond();
             br.Save(outputFilename);
         }
     }

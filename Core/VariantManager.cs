@@ -63,12 +63,6 @@ namespace InfiniteVariantTool.Core
             return variantManager;
         }
 
-        // if customs manifest has entries not in game manifest, add them
-        private static void FixCustomsManifest()
-        {
-
-        }
-
         // get variant entry from game manifest
         public BondAsset? GetVariantEntry(Guid assetId, Guid versionId, VariantType type)
         {

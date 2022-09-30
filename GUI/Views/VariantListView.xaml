@@ -62,7 +62,7 @@
                                     VerticalAlignment="Center"
                                     IsReadOnly="True"
                                     d:Text="EngineGameVariant"
-                                    Text="{Binding SelectedVariant.TypeStr, UpdateSourceTrigger=PropertyChanged}"/>
+                                    Text="{Binding SelectedVariant.Type, UpdateSourceTrigger=PropertyChanged}"/>
                             </Grid>
                             <Grid Visibility="{Binding SelectedVariant, Converter={StaticResource NullToVisibilityConverter}}">
                                 <Grid.RowDefinitions>
@@ -195,7 +195,7 @@
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
-                        <GridViewColumn Header="Type" Width="125" DisplayMemberBinding="{Binding TypeStr}" />
+                        <GridViewColumn Header="Type" Width="75" DisplayMemberBinding="{Binding Type}" />
                         <GridViewColumn Header="Name" Width="150" DisplayMemberBinding="{Binding Name}" />
                         <GridViewColumn Header="Description" Width="200" DisplayMemberBinding="{Binding Description}" />
                         <GridViewColumn Header="Asset ID" Width="200" DisplayMemberBinding="{Binding AssetId}" />

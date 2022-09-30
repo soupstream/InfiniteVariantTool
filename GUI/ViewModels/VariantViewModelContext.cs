@@ -327,7 +327,7 @@ namespace InfiniteVariantTool.GUI
                     {
                         Parent.VariantManager.UserCache.RemoveVariant(item.Filename!);
                     }
-                    await Parent.VariantManager.RemoveVariant(item.AssetId, item.VersionId, item.Type);
+                    await Parent.VariantManager.RemoveVariant(item.AssetId, item.VersionId, VariantType.FromEnum(item.Type));
                 });
             }
             removeQueue.Clear();
@@ -369,12 +369,12 @@ namespace InfiniteVariantTool.GUI
                 }
                 else
                 {
-                    loadedVariant = await Parent.VariantManager.GetVariant(oldVariant.AssetId, oldVariant.VersionId, oldVariant.Type, guidChanged, false);
+                    loadedVariant = await Parent.VariantManager.GetVariant(oldVariant.AssetId, oldVariant.VersionId, VariantType.FromEnum(oldVariant.Type), guidChanged, false);
                 }
                 if (guidChanged)
                 {
                     loadedVariant.SetGuids(newVariant.AssetId, newVariant.VersionId);
-                    await Parent.VariantManager.RemoveVariant(oldVariant.AssetId, oldVariant.VersionId, oldVariant.Type);
+                    await Parent.VariantManager.RemoveVariant(oldVariant.AssetId, oldVariant.VersionId, VariantType.FromEnum(oldVariant.Type));
                     if (oldVariant.Enabled == true)
                     {
                         variantsToEnable.Add(entry);
@@ -418,13 +418,13 @@ namespace InfiniteVariantTool.GUI
                     }
                 }
 
-                Parent.VariantManager.SetVariantEnabled(newVariant.AssetId, newVariant.VersionId, newVariant.Type, true);
+                Parent.VariantManager.SetVariantEnabled(newVariant.AssetId, newVariant.VersionId, VariantType.FromEnum(newVariant.Type), true);
             }
 
             foreach (var entry in variantsToDisable)
             {
                 VariantModel newVariant = entry.Key;
-                Parent.VariantManager.SetVariantEnabled(newVariant.AssetId, newVariant.VersionId, newVariant.Type, false);
+                Parent.VariantManager.SetVariantEnabled(newVariant.AssetId, newVariant.VersionId, VariantType.FromEnum(newVariant.Type), false);
             }
 
             changeQueue.Clear();
@@ -487,7 +487,7 @@ namespace InfiniteVariantTool.GUI
             }
             else
             {
-                variant = await Parent.VariantManager!.GetVariant(SelectedVariant.AssetId, SelectedVariant.VersionId, SelectedVariant.Type, false, false);
+                variant = await Parent.VariantManager!.GetVariant(SelectedVariant.AssetId, SelectedVariant.VersionId, VariantType.FromEnum(SelectedVariant.Type), false, false);
             }
             ObservableCollection<VariantModel> newSelection = new();
             if (variant.Variant is UgcGameVariant ugcVariant && ugcVariant.EngineGameVariantLink != null)
@@ -524,7 +524,7 @@ namespace InfiniteVariantTool.GUI
                     {
                         IsUserVariantSelected = selectedVariant.IsUserVariant;
                         IsNonUserVariantSelected = !selectedVariant.IsUserVariant;
-                        IsUgcGameVariantSelected = selectedVariant.Type == VariantType.UgcGameVariant;
+                        IsUgcGameVariantSelected = selectedVariant.Type == VariantType.UgcGameVariant.EnumValue;
                     }
                     OnPropertyChange();
                 }

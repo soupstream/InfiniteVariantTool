@@ -528,7 +528,15 @@ namespace InfiniteVariantTool.Core.Serialization
             {
                 BondReader br = new(bondblob.Value);
                 var blobNode = Doc.Descendants("blob").First(node => node.GetText() == bondblob.Key);
-                var result = br.Read();
+                BondReadResult result;
+                try
+                {
+                    result = br.Read();
+                }
+                catch
+                {
+                    continue;
+                }
                 blobNode.RemoveNodes();
                 blobNode.Add(result.Doc);
                 Blobs.Remove(bondblob.Key);

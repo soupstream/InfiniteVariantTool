@@ -107,19 +107,13 @@ namespace InfiniteVariantTool.GUI
 
         private bool VariantFilter(VariantModel variant)
         {
-            bool result = true;
-            if (variant.Type == VariantType.MapVariant)
+            bool result = variant.Type switch
             {
-                result &= ShowMapVariants;
-            }
-            else if (variant.Type == VariantType.EngineGameVariant)
-            {
-                result &= ShowEngineGameVariants;
-            }
-            else if (variant.Type == VariantType.UgcGameVariant)
-            {
-                result &= ShowUgcGameVariants;
-            }
+                VariantTypeEnum.Map => ShowMapVariants,
+                VariantTypeEnum.Engine => ShowEngineGameVariants,
+                VariantTypeEnum.UGC => ShowUgcGameVariants,
+                _ => true
+            };
 
             if (variant.Enabled != null)
             {
@@ -130,7 +124,7 @@ namespace InfiniteVariantTool.GUI
             {
                 result &= variant.Name.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
                     || variant.Description.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
-                    || variant.Type.Name.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
+                    || variant.Type.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
                     || variant.VersionId.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
                     || variant.AssetId.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase);
             }
