@@ -1,4 +1,5 @@
 ﻿using InfiniteVariantTool.Core;
+using InfiniteVariantTool.Core.Cache;
 using InfiniteVariantTool.Core.Settings;
 using System;
 using System.Collections.Generic;
@@ -103,7 +104,7 @@ namespace InfiniteVariantTool.GUI
                 {
                     languageOptions = new();
                     languageOptions.Add(new LanguageModel("auto", "auto"));
-                    foreach (var lang in VariantManager.LanguageCodes)
+                    foreach (var lang in Language.Languages)
                     {
                         if (lang.Name != "")
                         {

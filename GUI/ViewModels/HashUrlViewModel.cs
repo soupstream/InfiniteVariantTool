@@ -1,4 +1,5 @@
 ﻿using InfiniteVariantTool.Core;
+using InfiniteVariantTool.Core.Cache;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,21 +10,23 @@ namespace InfiniteVariantTool.GUI
 {
     public class HashUrlViewModel : ViewModel
     {
-        public HashUrlViewModel()
+        VariantManager variantManager;
+        public HashUrlViewModel(VariantManager variantManager)
         {
+            this.variantManager = variantManager;
             url = "";
             offlineHash = "";
             onlineHash = "";
             lanHash = "";
         }
 
-        private string GetHash(string url, EndpointType endpointType)
+        private string GetHash(CacheManager cache, string url)
         {
             if (url == "")
             {
                 return "";
             }
-            return UrlHasher.TryHashUrl(url, endpointType)?.ToString() ?? "N/A";
+            return cache.Api.CallUrl(url)?.Hash.ToString() ?? "N/A";
         }
 
         private string url;
@@ -37,9 +40,9 @@ namespace InfiniteVariantTool.GUI
                     url = value;
                     OnPropertyChange(nameof(Url));
 
-                    OfflineHash = GetHash(url, EndpointType.Offline);
-                    OnlineHash = GetHash(url, EndpointType.Online);
-                    LanHash = GetHash(url, EndpointType.Lan);
+                    OfflineHash = GetHash(variantManager.OfflineCache, url);
+                    OnlineHash = GetHash(variantManager.OnlineCache, url);
+                    LanHash = GetHash(variantManager.LanCache, url);
                 }
             }
         }

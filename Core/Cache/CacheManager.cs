@@ -19,6 +19,13 @@ using System.Threading.Tasks;
 
 namespace InfiniteVariantTool.Core.Cache
 {
+    public enum ApiType
+    {
+        Online,
+        Offline,
+        Lan
+    }
+
     public class CacheManager
     {
         bool localized;
@@ -102,6 +109,46 @@ namespace InfiniteVariantTool.Core.Cache
             CustomsManifestApiCall = Api.Call(customsManifestEndpointId, parameters);
             GameManifest = await TryGetCachedBondFile<GameManifest>(GameManifestApiCall) ?? new();
             CustomsManifest = await TryGetCachedBondFile<CustomsManifest>(CustomsManifestApiCall) ?? new();
+
+            FixCustomsManifest();
+        }
+
+        // fix missing variants and version ID mismatches between game manifest and customs manifest
+        private void FixCustomsManifest()
+        {
+            foreach (var type in VariantType.VariantTypes)
+            {
+                if (type != VariantType.EngineGameVariant)
+                {
+                    var customsManifestLinks = type.GetLinks(CustomsManifest);
+                    var gameManifestLinks = type.GetLinks(GameManifest);
+
+                    var customsManifestLinkMap = customsManifestLinks.ToDictionary(
+                        link => (Guid)link.AssetId,
+                        link => link);
+                    var gameManifestLinkMap = gameManifestLinks.ToDictionary(
+                        link => (Guid)link.AssetId,
+                        link => link);
+
+                    // fix version ID mismatches
+                    foreach (var customsManifestLink in customsManifestLinks)
+                    {
+                        Guid assetId = (Guid)customsManifestLink.AssetId;
+                        if (gameManifestLinkMap.TryGetValue(assetId, out var gameManifestLink))
+                        {
+                            customsManifestLink.SetGuids(null, (Guid)gameManifestLink.VersionId);
+                            customsManifestLinkMap.Remove(assetId);
+                            gameManifestLinkMap.Remove(assetId);
+                        }
+                    }
+
+                    // fix missing variants
+                    foreach (var customsManifestLink in customsManifestLinkMap.Values)
+                    {
+                        gameManifestLinks.Add(new BondAsset(customsManifestLink));
+                    }
+                }
+            }
         }
 
         public static async Task<CacheManager> LoadOnlineCache(string gameDir, string buildNumber)
@@ -196,6 +243,26 @@ namespace InfiniteVariantTool.Core.Cache
         public async Task<byte[]> GetFile(ApiCall apiCall, MimeType mimeType)
         {
             return await TryGetCachedFile(apiCall, mimeType) ?? await DownloadFile(apiCall, mimeType);
+        }
+
+        public async Task<byte[]?> TryGetFile(ApiCall apiCall, MimeType mimeType)
+        {
+            byte[]? file = await TryGetCachedFile(apiCall, mimeType);
+            if (file == null)
+            {
+                try
+                {
+                    file = await DownloadFile(apiCall, mimeType);
+                }
+                catch (HttpRequestException ex)
+                {
+                    if (ex.StatusCode != HttpStatusCode.NotFound)
+                    {
+                        throw;
+                    }
+                }
+            }
+            return file;
         }
 
         public async Task<byte[]?> TryGetCachedFile(ApiCall apiCall, MimeType mimeType)
@@ -342,7 +409,9 @@ namespace InfiniteVariantTool.Core.Cache
             };
             ulong hash = apiCall.Hash;
             string filePath = Path.Combine(Directory, hash.ToString());
-            await File.WriteAllBytesAsync(filePath, SchemaSerializer.SerializeBond(cacheFile));
+            System.IO.Directory.CreateDirectory(Directory);
+            byte[] cacheData = SchemaSerializer.SerializeBond(cacheFile);
+            await File.WriteAllBytesAsync(filePath, cacheData);
 
             // add entry to cache map
             var fileTime = DateTime.UtcNow.ToFileTime();
@@ -352,7 +421,7 @@ namespace InfiniteVariantTool.Core.Cache
                 AccessTime = fileTime,
                 WriteTime = fileTime,
                 Metadata = cacheFile.Metadata,
-                Size = (ulong)data.LongLength
+                Size = (ulong)cacheData.LongLength
             };
             CacheMap.Entries[hash] = entry;
         }

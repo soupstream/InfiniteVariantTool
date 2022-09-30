@@ -75,6 +75,16 @@ namespace InfiniteVariantTool.Core.Serialization
             return JsonSerializer.Serialize(src, src.GetType(), jsonOptions);
         }
 
+        public static string SerializeJson(object src, Type type)
+        {
+            return JsonSerializer.Serialize(src, type, jsonOptions);
+        }
+
+        public static async Task SerializeJsonAsync(Stream stream, object src, Type type)
+        {
+            await JsonSerializer.SerializeAsync(stream, src, type, jsonOptions);
+        }
+
         public static T SerializeXml<T>(XElement doc)
         {
             BondWriter bw = new(doc);

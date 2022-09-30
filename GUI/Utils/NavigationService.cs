@@ -16,7 +16,7 @@ namespace InfiniteVariantTool.GUI
         public abstract void OpenPackCacheFileWindow();
         public abstract void OpenUnpackLuaBundleWindow();
         public abstract void OpenPackLuaBundleWindow();
-        public abstract void OpenHashUrlWindow();
+        public abstract void OpenHashUrlWindow(VariantManager variantManager);
         public abstract void OpenResultWindow(string output, string? path);
         public abstract void OpenExtractWindow(VariantManager variantManager, VariantModel variant);
         public abstract void OpenAboutWindow();
@@ -69,7 +69,7 @@ namespace InfiniteVariantTool.GUI
             WindowManager.ShowOrActivate<FileActionWindow, PackLuaBundleViewModel>();
         }
 
-        public override void OpenHashUrlWindow()
+        public override void OpenHashUrlWindow(VariantManager variantManager)
         {
             WindowManager.ShowOrActivate<HashUrlWindow>();
         }

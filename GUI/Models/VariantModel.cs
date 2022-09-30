@@ -17,28 +17,16 @@ namespace InfiniteVariantTool.GUI
             description = "";
         }
 
-        public VariantModel(VariantEntry entry)
+        public VariantModel(VariantAsset entry, bool isUserVariant)
         {
-            name = entry.Metadata.PublicName;
-            description = entry.Metadata.Description;
+            name = entry.Variant.PublicName;
+            description = entry.Variant.Description;
             enabled = entry.Enabled;
-            assetId = entry.Metadata.AssetId;
-            versionId = entry.Metadata.VersionId;
+            assetId = (Guid)entry.Variant.AssetId;
+            versionId = (Guid)entry.Variant.VersionId;
             Type = entry.Type;
-            Filename = null;
-            IsUserVariant = false;
-        }
-
-        public VariantModel(UserVariantEntry entry)
-        {
-            name = entry.Metadata.Base.PublicName;
-            description = entry.Metadata.Base.Description;
-            enabled = entry.Enabled;
-            assetId = entry.Metadata.Base.AssetId;
-            versionId = entry.Metadata.Base.VersionId;
-            Type = entry.Metadata.Type;
-            Filename = entry.Path;
-            IsUserVariant = true;
+            Filename = entry.FilePath;
+            IsUserVariant = isUserVariant;
         }
 
         public VariantModel(VariantModel variant)
@@ -129,6 +117,11 @@ namespace InfiniteVariantTool.GUI
         }
 
         public VariantType Type { get; set; }
+        public string TypeStr
+        {
+            get => Type.Name;
+            set => throw new InvalidOperationException();
+        }
         public string? Filename { get; set; }
         public bool IsUserVariant { get; set; }
     }

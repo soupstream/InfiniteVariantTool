@@ -136,7 +136,8 @@ namespace InfiniteVariantTool.Core.Utils
         public static readonly FileExtension Jpg = new(".jpg");
         public static readonly FileExtension Strings = new(".strings");
         public static readonly FileExtension Luabundle = new(".luabundle");
-        public static readonly List<FileExtension> Extensions = new() { Bin, Xml, Json, Png, Jpg, Strings, Luabundle };
+        public static readonly FileExtension DebugScriptSource = new(".debugscriptsource");
+        public static readonly List<FileExtension> Extensions = new() { Bin, Xml, Json, Png, Jpg, Strings, Luabundle, DebugScriptSource };
     }
 
     public class FileNameDeduper

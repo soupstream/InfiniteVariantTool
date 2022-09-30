@@ -37,7 +37,7 @@ namespace InfiniteVariantTool.GUI
         }
 
         public RelayCommand OpenSettingsWindowCommand => new SyncRelayCommand(_ => NavigationService.OpenSettingsWindow());
-        public RelayCommand OpenHashUrlWindowCommand => new SyncRelayCommand(_ => NavigationService.OpenHashUrlWindow());
+        public RelayCommand OpenHashUrlWindowCommand => new SyncRelayCommand(_ => NavigationService.OpenHashUrlWindow(VariantViewModel.VariantManager!), _ => VariantViewModel.VariantManager != null);
         public RelayCommand OpenUnpackCacheFileWindowCommand => new SyncRelayCommand(_ => NavigationService.OpenUnpackCacheFileWindow());
         public RelayCommand OpenPackCacheFileWindowCommand => new SyncRelayCommand(_ => NavigationService.OpenPackCacheFileWindow());
         public RelayCommand OpenUnpackLuaBundleWindowCommand => new SyncRelayCommand(_ => NavigationService.OpenUnpackLuaBundleWindow());

@@ -44,17 +44,6 @@ namespace InfiniteVariantTool.Core.Variants
 
         private string VariantTypeName => Variant.GetType().Name;
 
-        private static readonly JsonSerializerOptions jsonOptions = new()
-        {
-            WriteIndented = true,
-            IgnoreReadOnlyFields = true,
-            IgnoreReadOnlyProperties = true,
-            Converters =
-            {
-                new BondGuidJsonConverter()
-            }
-        };
-
         // gather variant types
         private static readonly Type[] variantTypes = typeof(BondAsset)
             .Assembly.GetTypes()
@@ -98,6 +87,7 @@ namespace InfiniteVariantTool.Core.Variants
                         }
 
                         VariantAsset variantAsset = new(variant);
+                        variantAsset.FilePath = Path.GetFullPath(variantFilePath);
                         if (loadFiles)
                         {
                             await variantAsset.LoadFiles(directory);
@@ -107,6 +97,24 @@ namespace InfiniteVariantTool.Core.Variants
                 }
             }
             throw new Exception("variant file not found");
+        }
+
+        public static IEnumerable<string> FindVariants(string dir)
+        {
+            foreach (string path in Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories))
+            {
+                string fileName = Path.GetFileName(path);
+                foreach (Type variantType in variantTypes)
+                {
+                    foreach (FileExtension extension in supportedExtensions)
+                    {
+                        if (fileName.Equals(variantType.Name + extension.Value, StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            yield return path;
+                        }
+                    }
+                }
+            }
         }
 
         // save variant to disk
@@ -124,7 +132,7 @@ namespace InfiniteVariantTool.Core.Variants
             string variantFilePath = Path.Combine(directory, VariantTypeName + FileExtension.Json.Value);
             Directory.CreateDirectory(directory);
             using var stream = File.OpenWrite(variantFilePath);
-            await JsonSerializer.SerializeAsync(stream, Variant, jsonOptions);
+            await SchemaSerializer.SerializeJsonAsync(stream, Variant, Type.ClassType);
             foreach (string relativeFilePath in Variant.Files.FileRelativePaths)
             {
                 if (Files.ContainsKey(relativeFilePath))
@@ -157,7 +165,7 @@ namespace InfiniteVariantTool.Core.Variants
             Variant.GenerateGuids(generateAssetId, generateVersionId);
             if (Variant is UgcGameVariant ugcVar && ugcVar.EngineGameVariantLink is BondAsset engineLink)
             {
-                var linkedVariants = LinkedVariants.Where(variant => variant.Variant.GuidsEqual(engineLink));
+                var linkedVariants = LinkedVariants.Where(variant => variant.Variant.AssetIdEqual(engineLink)).ToArray();
                 engineLink.GenerateGuids(generateAssetId, generateVersionId);
                 foreach (var linkedVariant in linkedVariants)
                 {
@@ -181,6 +189,7 @@ namespace InfiniteVariantTool.Core.Variants
     {
         public readonly Type ClassType;
         public readonly string EndpointId;
+        public string Name => ClassType.Name;
         private VariantType(Type classType, string endpointId)
         {
             ClassType = classType;
@@ -212,7 +221,7 @@ namespace InfiniteVariantTool.Core.Variants
             }
         }
 
-        public List<BondAsset>? GetLinks(CustomsManifest manifest)
+        public List<BondAsset> GetLinks(CustomsManifest manifest)
         {
             if (this == MapVariant)
             {

@@ -26,7 +26,7 @@ namespace InfiniteVariantTool.GUI
             get
             {
                 DirectoryFileNameDeduper deduper = new(UserSettings.Instance.VariantDirectory);
-                string filename = Util.MakeValidFilename(variant.Name);
+                string filename = FileUtil.MakeValidFilename(variant.Name);
                 return deduper.Dedupe(Path.Combine(UserSettings.Instance.VariantDirectory, filename));
             }
         }
@@ -42,34 +42,6 @@ namespace InfiniteVariantTool.GUI
                 if (value != outputDirectory)
                 {
                     outputDirectory = value;
-                    OnPropertyChange();
-                }
-            }
-        }
-
-        private bool unpackXmlContent = true;
-        public bool UnpackXmlContent
-        {
-            get => unpackXmlContent;
-            set
-            {
-                if (value != unpackXmlContent)
-                {
-                    unpackXmlContent = value;
-                    OnPropertyChange();
-                }
-            }
-        }
-
-        private bool unpackLuaBundles = true;
-        public bool UnpackLuaBundles
-        {
-            get => unpackLuaBundles;
-            set
-            {
-                if (value != unpackLuaBundles)
-                {
-                    unpackLuaBundles = value;
                     OnPropertyChange();
                 }
             }
@@ -117,20 +89,6 @@ namespace InfiniteVariantTool.GUI
             }
         }
 
-        private bool downloadLuaSource;
-        public bool DownloadLuaSource
-        {
-            get => downloadLuaSource;
-            set
-            {
-                if (value != downloadLuaSource)
-                {
-                    downloadLuaSource = value;
-                    OnPropertyChange();
-                }
-            }
-        }
-
         public RelayCommand PickOutputDirectoryCommand => new SyncRelayCommand(_ =>
         {
             if (IOService.TrySelectPath(out string? path, PathSelectType.Open, "Select output folder", "Directory|."))
@@ -146,19 +104,10 @@ namespace InfiniteVariantTool.GUI
             string outputDirectory = OutputDirectory == "" ? DefaultOutputDirectory : OutputDirectory;
             try
             {
-
-                var loadedVariant = await variantManager.GetVariant(variant.AssetId, variant.VersionId, null, null, null, ExtractEngineGameVariant, true, true, downloadLuaSource);
-                if (GenerateNewAssetId)
-                {
-                    loadedVariant.GenerateAssetId();
-                }
-                if (GenerateNewVersionId)
-                {
-                    loadedVariant.GenerateVersionId();
-                }
-                loadedVariant.UnpackBondContent = UnpackXmlContent;
-                loadedVariant.UnpackLuaBundles = UnpackLuaBundles;
-                await Task.Run(() => loadedVariant.Save(outputDirectory));
+                var loadedVariant = await variantManager.GetVariant(variant.AssetId, variant.VersionId, variant.Type, true, extractEngineGameVariant);
+                loadedVariant.GenerateGuids(GenerateNewAssetId, GenerateNewVersionId);
+                await loadedVariant.Save(outputDirectory);
+                await variantManager.Flush();
                 output = "Success\r\n\r\nVariant extracted to " + outputDirectory;
                 success = true;
             }

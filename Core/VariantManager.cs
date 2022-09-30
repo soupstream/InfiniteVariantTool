@@ -1,4 +1,5 @@
-﻿using InfiniteVariantTool.Core.BondSchema;
+﻿using Bond;
+using InfiniteVariantTool.Core.BondSchema;
 using InfiniteVariantTool.Core.Cache;
 using InfiniteVariantTool.Core.Settings;
 using InfiniteVariantTool.Core.Utils;
@@ -23,20 +24,20 @@ namespace InfiniteVariantTool.Core
         public CacheManager OnlineCache { get; }
         public CacheManager OfflineCache { get; }
         public CacheManager LanCache { get; }
-        private UserCacheManager userCache;
+        public UserCacheManager UserCache { get; }
         private List<CacheManager> caches;  // caches to update
-        private List<VariantAsset> variantAssets;
+        public List<VariantAsset> VariantAssets { get; }
 
         private VariantManager(string gameDir, Language language, UserCacheManager userCache, CacheManager onlineCache, CacheManager offlineCache, CacheManager lanCache)
         {
             this.gameDir = gameDir;
             this.language = language;
-            this.userCache = userCache;
+            UserCache = userCache;
             OnlineCache = onlineCache;
             LanCache = lanCache;
             OfflineCache = offlineCache;
             caches = new() { onlineCache, lanCache };
-            variantAssets = new();
+            VariantAssets = new();
             RefreshAssetList();
         }
 
@@ -48,6 +49,11 @@ namespace InfiniteVariantTool.Core
             return await Load(UserSettings.Instance.GameDirectory, UserSettings.Instance.VariantDirectory, buildNumber, languagePicker);
         }
 
+        public static async Task<VariantManager> Load()
+        {
+            return await Load(() => throw new LanguageNotFoundException());
+        }
+
         public static async Task<VariantManager> Load(string gameDir, string userCacheDir, string buildNumber, Func<Language> languagePicker)
         {
             var caches = await CacheManager.LoadAllCaches(gameDir, buildNumber, languagePicker);
@@ -57,6 +63,12 @@ namespace InfiniteVariantTool.Core
             return variantManager;
         }
 
+        // if customs manifest has entries not in game manifest, add them
+        private static void FixCustomsManifest()
+        {
+
+        }
+
         // get variant entry from game manifest
         public BondAsset? GetVariantEntry(Guid assetId, Guid versionId, VariantType type)
         {
@@ -64,38 +76,51 @@ namespace InfiniteVariantTool.Core
             return links.Find(entry => (Guid)entry.AssetId == assetId && (Guid)entry.VersionId == versionId);
         }
 
-        public async Task<VariantAsset> GetVariant(Guid assetId, Guid versionId, VariantType type)
+        public async Task<VariantAsset> GetVariant(Guid assetId, Guid versionId, VariantType type, bool getFiles, bool getLinkedVariant)
         {
             var apiCall = PrimaryCache.GetDiscoveryApiCall(assetId, versionId, type);
             BondAsset variant = (BondAsset)await PrimaryCache.GetBondFile(apiCall, type.ClassType);
             VariantAsset variantAsset = new(variant);
 
-            // filter out unneeded files
-            IEnumerable<string> fileRelativePaths = variant.Files.FileRelativePaths
-                .Where(path => !Language.Languages.Any(lang => path.EndsWith($".{lang.ShortCode}")))
-                .Where(path => path.EndsWith($"_{language.ShortCode}.bin") || !Language.Languages.Any(lang => path.EndsWith($"_{lang.ShortCode}.bin")))
-                .Where(path => !path.EndsWith("_guid.txt"));
-
-            foreach (string relativePath in fileRelativePaths)
+            if (getFiles)
             {
-                ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
+                // add debug source if not already present
+                if (type == VariantType.EngineGameVariant)
                 {
-                    { "path", variant.Files.PrefixEndpoint.Path + relativePath },
-                });
-                variantAsset.Files[relativePath] = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
-            }
-            return variantAsset;
-        }
+                    string? debugScriptSourcePath = variant.Files.FileRelativePaths.Where(path => path.EndsWith("_guid.txt")).FirstOrDefault();
+                    if (debugScriptSourcePath != null)
+                    {
+                        debugScriptSourcePath = debugScriptSourcePath[..^"_guid.txt".Length] + FileExtension.Bin.Value + FileExtension.DebugScriptSource.Value;
+                        if (!variant.Files.FileRelativePaths.Contains(debugScriptSourcePath))
+                        {
+                            variant.Files.FileRelativePaths.Add(debugScriptSourcePath);
+                        }
+                    }
+                }
 
-        public async Task<VariantAsset> GetVariant(Guid assetId, Guid versionId, VariantType type, bool getLinkedVariant)
-        {
-            VariantAsset variant = await GetVariant(assetId, versionId, type);
-            if (getLinkedVariant && variant.Variant is UgcGameVariant ugcVar && ugcVar.EngineGameVariantLink is BondAsset engineVar)
-            {
-                VariantAsset link = await GetVariant((Guid)engineVar.AssetId, (Guid)engineVar.VersionId, VariantType.EngineGameVariant);
-                variant.LinkedVariants.Add(link);
+                // filter out unneeded files
+                IEnumerable<string> fileRelativePaths = variant.Files.FileRelativePaths
+                    .Where(path => !Language.Languages.Any(lang => path.EndsWith($".{lang.ShortCode}")))
+                    .Where(path => path.EndsWith($"_{language.ShortCode}.bin") || !Language.Languages.Any(lang => path.EndsWith($"_{lang.ShortCode}.bin")))
+                    .Where(path => !path.EndsWith("_guid.txt"));
+
+                foreach (string relativePath in fileRelativePaths)
+                {
+                    ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
+                    {
+                        { "path", variant.Files.PrefixEndpoint.Path + relativePath },
+                    });
+                    variantAsset.Files[relativePath] = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
+                }
             }
-            return variant;
+
+            if (getLinkedVariant && variantAsset.Variant is UgcGameVariant ugcVar && ugcVar.EngineGameVariantLink is BondAsset engineVar)
+            {
+                VariantAsset link = await GetVariant((Guid)engineVar.AssetId, (Guid)engineVar.VersionId, VariantType.EngineGameVariant, getFiles, false);
+                variantAsset.LinkedVariants.Add(link);
+            }
+
+            return variantAsset;
         }
 
         public async Task StoreVariant(VariantAsset variant)
@@ -266,20 +291,20 @@ namespace InfiniteVariantTool.Core
 
         private void RefreshAssetList()
         {
-            variantAssets.Clear();
-            variantAssets.AddRange(GetAssetList());
-            UpdateVariantsStatus(variantAssets);
-            UpdateVariantsStatus(userCache.Entries);
+            VariantAssets.Clear();
+            VariantAssets.AddRange(GetAssetList());
+            UpdateVariantsStatus(VariantAssets);
+            UpdateVariantsStatus(UserCache.Entries);
         }
 
         public IEnumerable<VariantAsset> FilterVariants(VariantFilter filter)
         {
-            return FilterVariants(variantAssets, filter);
+            return FilterVariants(VariantAssets, filter);
         }
 
         public IEnumerable<VariantAsset> FilterUserVariants(VariantFilter filter)
         {
-            return FilterVariants(userCache.Entries, filter);
+            return FilterVariants(UserCache.Entries, filter);
         }
 
         public IEnumerable<VariantAsset> FilterVariants(IEnumerable<VariantAsset> variants, VariantFilter filter)

@@ -158,11 +158,11 @@ namespace InfiniteVariantTool.Core.BondSchema
 
             if (versionId != null)
             {
-                string oldGuid = AssetId.ToString();
+                string oldGuid = VersionId.ToString();
                 string newGuid = versionId.Value.ToString();
                 Files.Prefix = Files.Prefix.Replace(oldGuid, newGuid);
                 Files.PrefixEndpoint.Path = Files.PrefixEndpoint.Path.Replace(oldGuid, newGuid);
-                AssetId = (BondGuid)versionId.Value;
+                VersionId = (BondGuid)versionId.Value;
             }
         }
 

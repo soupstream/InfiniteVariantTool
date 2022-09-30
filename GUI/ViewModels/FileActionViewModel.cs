@@ -12,7 +12,7 @@ namespace InfiniteVariantTool.GUI
     public class UnpackCacheFileViewModel : FileActionViewModel
     {
         public UnpackCacheFileViewModel()
-            : base("Unpack", "cache file", "All files (*.*)|*.*|Bin files (*.bin)|*.bin", "XML files (*.xml)|*.xml|All files (*.*)|*.*")
+            : base("Unpack", "Bond file", "All files (*.*)|*.*|Bin files (*.bin)|*.bin", "XML files (*.xml)|*.xml|All files (*.*)|*.*")
         {
 
         }
@@ -32,7 +32,7 @@ namespace InfiniteVariantTool.GUI
     public class PackCacheFileViewModel : FileActionViewModel
     {
         public PackCacheFileViewModel()
-            : base("Pack", "cache file", "XML files (*.xml)|*.xml|All files (*.*)|*.*", "All files (*.*)|*.*|Bin files (*.bin)|*.bin")
+            : base("Pack", "Bond file", "XML files (*.xml)|*.xml|All files (*.*)|*.*", "All files (*.*)|*.*|Bin files (*.bin)|*.bin")
         {
 
         }

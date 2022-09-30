@@ -4,12 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace InfiniteVariantTool.CLI
+namespace InfiniteVariantTool.Core.Utils
 {
-    public enum ApiType
+    public class LanguageNotFoundException : Exception
     {
-        online,
-        offline,
-        lan
     }
 }

@@ -272,9 +272,9 @@ namespace InfiniteVariantTool.CLI
             var caches = await CacheManager.LoadAllCaches(LanguageNotDetectedPicker);
             CacheManager cache = apiType switch
             {
-                ApiType.offline => caches.Offline,
-                ApiType.online => caches.Online,
-                ApiType.lan => caches.Lan,
+                ApiType.Offline => caches.Offline,
+                ApiType.Online => caches.Online,
+                ApiType.Lan => caches.Lan,
                 _ => throw new ArgumentException(apiType.ToString())
             };
             var apiCall = cache.Api.CallUrl(url);
@@ -337,7 +337,7 @@ namespace InfiniteVariantTool.CLI
             else
             {
                 var entry = entries.First();
-                var variant = await manager.GetVariant((Guid)entry.Variant.AssetId, (Guid)entry.Variant.VersionId, entry.Type, unpackLinked);
+                var variant = await manager.GetVariant((Guid)entry.Variant.AssetId, (Guid)entry.Variant.VersionId, entry.Type, true, unpackLinked);
                 if (generateGuids)
                 {
                     variant.GenerateGuids();

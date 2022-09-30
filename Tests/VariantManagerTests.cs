@@ -46,7 +46,7 @@ namespace InfiniteVariantTool.Tests
             Assert.IsNotNull(fiestaEntry);
 
             // save a variant
-            VariantAsset fiestaVariant = await manager.GetVariant((Guid)fiestaEntry.Variant.AssetId, (Guid)fiestaEntry.Variant.VersionId, fiestaEntry.Type, true);
+            VariantAsset fiestaVariant = await manager.GetVariant((Guid)fiestaEntry.Variant.AssetId, (Guid)fiestaEntry.Variant.VersionId, fiestaEntry.Type, true, true);
             string fiestaVariantDir = Path.Combine(userCacheDir, "fiesta_slayer");
             await fiestaVariant.Save(fiestaVariantDir);
 

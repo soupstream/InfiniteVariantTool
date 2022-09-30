@@ -44,7 +44,7 @@ namespace InfiniteVariantTool.Core.Cache
             }
 
             // remove empty parent directories
-            string currentPath = Path.GetFullPath(variantDirectory);
+            string currentPath = Path.GetFullPath(Path.GetDirectoryName(variantDirectory)!);
             string basePath = Path.GetFullPath(cacheDirectory);
             while (!currentPath.Equals(basePath, StringComparison.InvariantCultureIgnoreCase) && Directory.Exists(currentPath)
                 && !Directory.EnumerateFileSystemEntries(currentPath).Any())

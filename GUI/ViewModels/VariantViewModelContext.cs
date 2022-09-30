@@ -1,4 +1,5 @@
 ﻿using InfiniteVariantTool.Core;
+using InfiniteVariantTool.Core.BondSchema;
 using InfiniteVariantTool.Core.Settings;
 using InfiniteVariantTool.Core.Utils;
 using InfiniteVariantTool.Core.Variants;
@@ -324,9 +325,9 @@ namespace InfiniteVariantTool.GUI
                 {
                     if (item.IsUserVariant)
                     {
-                        Parent.VariantManager.RemoveUserVariant(item.Filename!);
+                        Parent.VariantManager.UserCache.RemoveVariant(item.Filename!);
                     }
-                    await Parent.VariantManager.RemoveVariant(item.AssetId, item.VersionId);
+                    await Parent.VariantManager.RemoveVariant(item.AssetId, item.VersionId, item.Type);
                 });
             }
             removeQueue.Clear();
@@ -361,34 +362,33 @@ namespace InfiniteVariantTool.GUI
                 VariantModel oldVariant = entry.Value;
                 bool guidChanged = oldVariant.AssetId != newVariant.AssetId || oldVariant.VersionId != newVariant.VersionId;
 
-                Variant loadedVariant;
+                VariantAsset loadedVariant;
                 if (oldVariant.IsUserVariant)
                 {
-                    loadedVariant = Variant.Load(oldVariant.Filename!);
+                    loadedVariant = await VariantAsset.Load(oldVariant.Filename!, guidChanged);
                 }
                 else
                 {
-                    loadedVariant = await Parent.VariantManager.GetVariant(oldVariant.AssetId, oldVariant.VersionId, null, null, null, false, guidChanged, false, false);
+                    loadedVariant = await Parent.VariantManager.GetVariant(oldVariant.AssetId, oldVariant.VersionId, oldVariant.Type, guidChanged, false);
                 }
                 if (guidChanged)
                 {
-                    loadedVariant.SetAssetId(newVariant.AssetId);
-                    loadedVariant.SetVersionId(newVariant.VersionId);
-                    await Parent.VariantManager.RemoveVariant(oldVariant.AssetId, oldVariant.VersionId);
+                    loadedVariant.SetGuids(newVariant.AssetId, newVariant.VersionId);
+                    await Parent.VariantManager.RemoveVariant(oldVariant.AssetId, oldVariant.VersionId, oldVariant.Type);
                     if (oldVariant.Enabled == true)
                     {
                         variantsToEnable.Add(entry);
                     }
                 }
 
-                loadedVariant.Metadata.Base.PublicName = newVariant.Name;
-                loadedVariant.Metadata.Base.Description = newVariant.Description;
-                Parent.VariantManager.SaveVariant(loadedVariant);
+                loadedVariant.Variant.PublicName = newVariant.Name;
+                loadedVariant.Variant.Description = newVariant.Description;
+                await Parent.VariantManager.StoreVariant(loadedVariant);
                 reinstallQueue.Remove(newVariant);
 
                 if (oldVariant.IsUserVariant)
                 {
-                    loadedVariant.Save(Path.GetDirectoryName(newVariant.Filename!)!);
+                    await loadedVariant.Save(Path.GetDirectoryName(newVariant.Filename!)!);
                 }
             }
 
@@ -400,17 +400,31 @@ namespace InfiniteVariantTool.GUI
                 // install user variant if it wasn't already installed
                 if (newVariant.IsUserVariant && !variantsToModify.Contains(entry))
                 {
-                    Parent.VariantManager.SaveVariant(Variant.Load(oldVariant.Filename!));
+                    VariantAsset variant = await VariantAsset.Load(oldVariant.Filename!, true);
+                    await Parent.VariantManager.StoreVariant(variant);
                     reinstallQueue.Remove(newVariant);
+
+                    // also install linked variant
+                    if (variant.Variant is UgcGameVariant ugcVariant && ugcVariant.EngineGameVariantLink != null)
+                    {
+                        var engineMetadata = ugcVariant.EngineGameVariantLink;
+                        foreach (var searchVariant in Variants)
+                        {
+                            if (searchVariant.AssetId == (Guid)engineMetadata.AssetId && searchVariant.VersionId == (Guid)engineMetadata.VersionId)
+                            {
+                                reinstallQueue.Add(searchVariant);
+                            }
+                        }
+                    }
                 }
 
-                Parent.VariantManager.EnableVariant(newVariant.AssetId, newVariant.VersionId);
+                Parent.VariantManager.SetVariantEnabled(newVariant.AssetId, newVariant.VersionId, newVariant.Type, true);
             }
 
             foreach (var entry in variantsToDisable)
             {
                 VariantModel newVariant = entry.Key;
-                Parent.VariantManager.DisableVariant(newVariant.AssetId, newVariant.VersionId);
+                Parent.VariantManager.SetVariantEnabled(newVariant.AssetId, newVariant.VersionId, newVariant.Type, false);
             }
 
             changeQueue.Clear();
@@ -418,19 +432,14 @@ namespace InfiniteVariantTool.GUI
             foreach (var variant in reinstallQueue)
             {
                 reload = true;
-                Parent.VariantManager.SaveVariant(Variant.Load(variant.Filename!));
+                await Parent.VariantManager.StoreVariant(await VariantAsset.Load(variant.Filename!, true));
             }
             reinstallQueue.Clear();
 
-            try
-            {
-                await Task.Run(async () => await Parent.VariantManager.Save());
-            }
-            finally
-            {
-                AreChangesQueued = false;
-                Parent.ApplyingVariantChanges = false;
-            }
+            AreChangesQueued = false;
+            Parent.ApplyingVariantChanges = false;
+
+            await Parent.VariantManager.Flush();
 
             if (reload)
             {
@@ -471,28 +480,28 @@ namespace InfiniteVariantTool.GUI
                 return;
             }
 
-            VariantMetadata metadata;
+            VariantAsset variant;
             if (SelectedVariant.IsUserVariant)
             {
-                metadata = VariantMetadata.TryLoadMetadata(SelectedVariant.Filename!) ?? throw new Exception();
+                variant = await VariantAsset.Load(SelectedVariant.Filename!, false);
             }
             else
             {
-                var loadedVariant = await Parent.VariantManager!.GetVariant(SelectedVariant.AssetId, SelectedVariant.VersionId, null, null, null, false, false, false, false);
-                metadata = loadedVariant.Metadata;
+                variant = await Parent.VariantManager!.GetVariant(SelectedVariant.AssetId, SelectedVariant.VersionId, SelectedVariant.Type, false, false);
             }
             ObservableCollection<VariantModel> newSelection = new();
-            if (metadata is UgcGameVariantMetadata ugcMetadata && ugcMetadata.EngineGameVariantLink != null)
+            if (variant.Variant is UgcGameVariant ugcVariant && ugcVariant.EngineGameVariantLink != null)
             {
-                var engineMetadata = ugcMetadata.EngineGameVariantLink;
-                foreach (var variant in Variants)
+                var engineMetadata = ugcVariant.EngineGameVariantLink;
+                foreach (var searchVariant in Variants)
                 {
-                    if (variant.AssetId == engineMetadata.AssetId && variant.VersionId == engineMetadata.VersionId)
+                    if (searchVariant.AssetId == (Guid)engineMetadata.AssetId && searchVariant.VersionId == (Guid)engineMetadata.VersionId)
                     {
-                        newSelection.Add(variant);
+                        newSelection.Add(searchVariant);
                     }
                 }
             }
+            
             SelectedVariants = newSelection;
         }
 
@@ -831,9 +840,8 @@ namespace InfiniteVariantTool.GUI
                 }
             }
 
-            await Task.Run(() => variantManager.LoadUserCache(UserSettings.Instance.VariantDirectory));
-            Variants = new(variantManager.GetUserVariantEntries()
-                .Select(entry => new VariantModel(entry)));
+            Variants = new(variantManager.UserCache.Entries
+                .Select(entry => new VariantModel(entry, true)));
             if (Variants.Count == 0)
             {
                 ErrorMessage = "No variants installed.\r\nYou can install variants with File > Install variant...";
@@ -860,12 +868,13 @@ namespace InfiniteVariantTool.GUI
             }
 
             Parent.ApplyingVariantChanges = true;
-            foreach (Variant variant in Variant.LoadVariants(variantsDir))
+            foreach (string variantFile in VariantAsset.FindVariants(variantsDir))
             {
-                Parent.VariantManager.SaveVariant(variant);
-                Parent.VariantManager.EnableVariant(variant.Metadata.Base.AssetId, variant.Metadata.Base.VersionId);
+                VariantAsset variant = await VariantAsset.Load(variantFile, true);
+                await Parent.VariantManager.StoreVariant(variant);
+                Parent.VariantManager.SetVariantEnabled(variant, true);
             }
-            await Task.Run(async () => await Parent.VariantManager.Save());
+            await Parent.VariantManager.Flush();
             Parent.ApplyingVariantChanges = false;
             await Parent.LoadVariants();
         }
@@ -896,25 +905,11 @@ namespace InfiniteVariantTool.GUI
 
         public override async Task<bool> LoadVariantsBase(VariantManager variantManager)
         {
-            await Task.Run(() => variantManager.LoadCache(() => UserSettings.Instance.Language));
-            if (variantManager.OnlineCache!.Language == "auto")
-            {
-                ErrorMessage = "Could not detect Halo Infinite's cache language.\r\nRun the game while online (at least until the menu loads) or manually set your language in Settings and try again.";
-                return false;
-            }
-
-            Variants = new(variantManager.GetVariantEntries(null, null, null, null, null)
-                .Select(entry => new VariantModel(entry)));
+            Variants = new(variantManager.VariantAssets
+                .Select(entry => new VariantModel(entry, false)));
             if (Variants.Count == 0)
             {
-                if (variantManager.OnlineCache.Exists)
-                {
-                    ErrorMessage = "Variant cache is empty.";
-                }
-                else
-                {
-                    ErrorMessage = "Variant cache does not exist.\r\nRun the game while online (at least until the menu loads) to generate it.";
-                }
+                ErrorMessage = "Variant cache is empty.";
             }
             return true;
         }

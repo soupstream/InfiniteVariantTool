@@ -27,11 +27,8 @@
                     </DockPanel>
                     <CheckBox Margin="{adonisUi:Space 0,0,0,1}" IsChecked="{Binding ExtractEngineGameVariant}" Content="Also extract engine game variant"
                               Visibility="{Binding IsUgcGameVariant, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <CheckBox Margin="{adonisUi:Space 0,0,0,1}" IsChecked="{Binding UnpackXmlContent}" Content="Unpack XML content"/>
-                    <CheckBox Margin="{adonisUi:Space 0,0,0,1}" IsChecked="{Binding UnpackLuaBundles}" Content="Unpack Lua bundles"/>
                     <CheckBox Margin="{adonisUi:Space 0,0,0,1}" IsChecked="{Binding GenerateNewAssetId}" Content="Generate new asset ID"/>
                     <CheckBox Margin="{adonisUi:Space 0,0,0,1}" IsChecked="{Binding GenerateNewVersionId}" Content="Generate new version ID"/>
-                    <CheckBox Margin="{adonisUi:Space 0,0,0,1}" IsChecked="{Binding DownloadLuaSource}" Content="Download Lua source code (if available)"/>
                 </StackPanel>
             </GroupBox>
         </DockPanel>

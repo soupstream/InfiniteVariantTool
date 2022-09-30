@@ -48,26 +48,46 @@ namespace InfiniteVariantTool.GUI
             AllVariantsContext.DiscardChangesCommand.Execute(null);
             if (!File.Exists(Path.Combine(UserSettings.Instance.GameDirectory, Constants.GameExeName)))
             {
-                string errorMessage = "Halo Infinite not found at " + UserSettings.Instance.GameDirectory + ".\r\nSet the correct game location in Settings and try again.";
-                UserVariantsContext.ErrorMessage = errorMessage;
-                AllVariantsContext.ErrorMessage = errorMessage;
-                UserVariantsContext.Variants.Clear();
-                AllVariantsContext.Variants.Clear();
-                UserVariantsContext.Loaded = false;
-                AllVariantsContext.Loaded = false;
+                SetErrorMessage("Halo Infinite not found at " + UserSettings.Instance.GameDirectory + ".\r\nSet the correct game location in Settings and try again.");
                 return;
             }
 
-            VariantManager = new VariantManager(UserSettings.Instance.GameDirectory);
-            await AllVariantsContext.LoadVariants(VariantManager);
+            if (!File.Exists(Path.Combine(UserSettings.Instance.GameDirectory, Constants.OnlineCacheDirectory, "webcache", "CacheMap.wcache")))
+            {
+                SetErrorMessage("Variant cache not found. Run the game and wait a minute after the main menu loads to generate the cache.");
+                return;
+            }
+
+            try
+            {
+                VariantManager = await VariantManager.Load(() => Language.TryFromCode(UserSettings.Instance.Language) ?? throw new LanguageNotFoundException());
+                await AllVariantsContext.LoadVariants(VariantManager);
+            }
+            catch (LanguageNotFoundException)
+            {
+                SetErrorMessage("Variant cache not found. Login to the game for a minute to generate the cache,"
+                    + "\r\nor set your language in Settings to continue with an empty cache.");
+                return;
+            }
+
             if (AllVariantsContext.Loaded)
             {
-                await UserVariantsContext.LoadVariants(VariantManager);
+                await UserVariantsContext.LoadVariants(VariantManager!);
             }
             else
             {
                 UserVariantsContext.ErrorMessage = AllVariantsContext.ErrorMessage;
             }
+        }
+
+        private void SetErrorMessage(string msg)
+        {
+            UserVariantsContext.ErrorMessage = msg;
+            AllVariantsContext.ErrorMessage = msg;
+            UserVariantsContext.Variants.Clear();
+            AllVariantsContext.Variants.Clear();
+            UserVariantsContext.Loaded = false;
+            AllVariantsContext.Loaded = false;
         }
 
         private RelayCommand? loadVariantsCommand;
@@ -87,26 +107,32 @@ namespace InfiniteVariantTool.GUI
 
         private bool VariantFilter(VariantModel variant)
         {
-            bool result = variant.Type switch
+            bool result = true;
+            if (variant.Type == VariantType.MapVariant)
             {
-                VariantType.MapVariant => ShowMapVariants,
-                VariantType.UgcGameVariant => ShowUgcGameVariants,
-                VariantType.EngineGameVariant => ShowEngineGameVariants,
-                _ => true
-            };
+                result &= ShowMapVariants;
+            }
+            else if (variant.Type == VariantType.EngineGameVariant)
+            {
+                result &= ShowEngineGameVariants;
+            }
+            else if (variant.Type == VariantType.UgcGameVariant)
+            {
+                result &= ShowUgcGameVariants;
+            }
+
             if (variant.Enabled != null)
             {
-                result = result && ((variant.Enabled.Value && ShowEnabledVariants)
-                    || (!variant.Enabled.Value && ShowDisabledVariants));
+                result &= (variant.Enabled.Value && ShowEnabledVariants)
+                    || (!variant.Enabled.Value && ShowDisabledVariants);
             }
             if (SearchText != "")
             {
-                result = result
-                    && (variant.Name.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
+                result &= variant.Name.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
                     || variant.Description.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
-                    || variant.Type.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
+                    || variant.Type.Name.Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
                     || variant.VersionId.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase)
-                    || variant.AssetId.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase));
+                    || variant.AssetId.ToString().Contains(SearchText, StringComparison.CurrentCultureIgnoreCase);
             }
             return result;
         }
