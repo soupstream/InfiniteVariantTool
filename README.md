@@ -36,7 +36,7 @@ You can put the extracted files anywhere you want and run InfiniteVariantTool.ex
 * Switch to the *All Variants* tab and select a variant.
 * Basic edits (name, description, etc.) can be made in the GUI.
 * Extract a variant to edit XML and Lua files.
-* Use *Tools > Pack cache files...* and *Tools > Pack Lua bundle...* to repack your changes.
+* Use *Tools > Pack bond files...* and *Tools > Pack Lua bundle...* to repack your changes.
 * Zip a variant folder to share it. You can include multiple variants in the zip file, and it doesn't matter which subfolder they're in.
 * To save your changes into the game after editing variant files, select it in *My Variants* and click *Reinstall*.
 
@@ -64,6 +64,6 @@ Sort of. You can't install modded variants directly on Xbox, but you can join a 
 
 ### My Halo Infinite installation got messed up. How do I fix it?
 
-In Steam, run *Verify integrity of game files...* on Halo Infinite to restore modified files.
-You may also have to delete the *disk_cache* and *server_disk_cache* folders from your Halo Infinite game folder.
+Delete the *disk_cache* and *server_disk_cache* folders from your Halo Infinite game folder.
 They are recreated automatically when you play the game online.
+If you're still having issues, run *Verify integrity of game files...* on Halo Infinite in Steam.
