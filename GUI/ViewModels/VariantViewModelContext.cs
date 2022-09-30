@@ -840,6 +840,8 @@ namespace InfiniteVariantTool.GUI
                 }
             }
 
+            await variantManager.UserCache.LoadEntries();
+            variantManager.UpdateVariantsStatus();
             Variants = new(variantManager.UserCache.Entries
                 .Select(entry => new VariantModel(entry, true)));
             if (Variants.Count == 0)

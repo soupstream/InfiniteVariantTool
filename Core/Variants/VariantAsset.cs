@@ -52,11 +52,6 @@ namespace InfiniteVariantTool.Core.Variants
 
         private static readonly FileExtension[] supportedExtensions = new FileExtension[] { FileExtension.Json, FileExtension.Xml, FileExtension.Bin };
 
-        // set of possible file names
-        public static readonly HashSet<string> VariantFileNames = variantTypes
-            .SelectMany(t => supportedExtensions.Select(ext => t.Name + ext.Value))
-            .ToHashSet();
-
         // load variant and attached files
         public static async Task<VariantAsset> Load(string variantFilePath, bool loadFiles)
         {
@@ -131,7 +126,7 @@ namespace InfiniteVariantTool.Core.Variants
 
             string variantFilePath = Path.Combine(directory, VariantTypeName + FileExtension.Json.Value);
             Directory.CreateDirectory(directory);
-            using var stream = File.OpenWrite(variantFilePath);
+            using var stream = File.Open(variantFilePath, FileMode.Create);
             await SchemaSerializer.SerializeJsonAsync(stream, Variant, Type.ClassType);
             foreach (string relativeFilePath in Variant.Files.FileRelativePaths)
             {

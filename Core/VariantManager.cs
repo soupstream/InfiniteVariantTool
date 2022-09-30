@@ -283,12 +283,17 @@ namespace InfiniteVariantTool.Core
             }
         }
 
+        public void UpdateVariantsStatus()
+        {
+            UpdateVariantsStatus(VariantAssets);
+            UpdateVariantsStatus(UserCache.Entries);
+        }
+
         private void RefreshAssetList()
         {
             VariantAssets.Clear();
             VariantAssets.AddRange(GetAssetList());
-            UpdateVariantsStatus(VariantAssets);
-            UpdateVariantsStatus(UserCache.Entries);
+            UpdateVariantsStatus();
         }
 
         public IEnumerable<VariantAsset> FilterVariants(VariantFilter filter)

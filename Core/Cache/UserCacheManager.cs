@@ -23,13 +23,9 @@ namespace InfiniteVariantTool.Core.Cache
         public async Task LoadEntries()
         {
             Entries.Clear();
-            foreach (string filePath in Directory.GetFiles(cacheDirectory, "*", SearchOption.AllDirectories))
+            foreach (string filePath in VariantAsset.FindVariants(cacheDirectory))
             {
-                string fileName = Path.GetFileName(filePath);
-                if (VariantAsset.VariantFileNames.Contains(fileName))
-                {
-                    Entries.Add(await VariantAsset.Load(filePath, false));
-                }
+                Entries.Add(await VariantAsset.Load(filePath, false));
             }
         }
 
