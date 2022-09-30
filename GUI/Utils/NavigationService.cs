@@ -71,7 +71,7 @@ namespace InfiniteVariantTool.GUI
 
         public override void OpenHashUrlWindow(VariantManager variantManager)
         {
-            WindowManager.ShowOrActivate<HashUrlWindow>();
+            WindowManager.ShowOrActivate<HashUrlWindow, HashUrlViewModel>(variantManager);
         }
 
         public override void OpenResultWindow(string output, string? path = null)

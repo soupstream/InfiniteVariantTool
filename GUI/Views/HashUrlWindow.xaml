@@ -10,10 +10,7 @@
         d:Background="{DynamicResource {x:Static adonisUi:Brushes.Layer0BackgroundBrush}}"
         WindowStartupLocation="CenterOwner"
         Title="Hash URL" SizeToContent="Height" Width="400">
-    <Window.DataContext>
-        <local:HashUrlViewModel/>
-    </Window.DataContext>
-    
+
     <Grid Margin="{adonisUi:Space 1}">
         <DockPanel>
             <Button

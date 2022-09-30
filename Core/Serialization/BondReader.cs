@@ -89,6 +89,7 @@ namespace InfiniteVariantTool.Core.Serialization
         public BondReadResult Save(string filename)
         {
             BondReadResult result = Read();
+            result.ReadEmbeddedBond();
             result.Save(filename);
             return result;
         }

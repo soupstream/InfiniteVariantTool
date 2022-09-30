@@ -25,8 +25,6 @@ namespace InfiniteVariantTool.GUI
         public override void FileAction(string inputFilename, string outputFilename)
         {
             BondReader br = new(inputFilename);
-            var result = br.Read();
-            result.ReadEmbeddedBond();
             br.Save(outputFilename);
         }
     }
@@ -66,7 +64,7 @@ namespace InfiniteVariantTool.GUI
 
         public override void FileAction(string inputFilename, string outputFilename)
         {
-            LuaBundle bundle = LuaBundle.Load(inputFilename);
+            LuaBundle bundle = LuaBundle.Unpack(inputFilename, Game.HaloInfinite);
             bundle.Save(outputFilename);
         }
     }
@@ -86,7 +84,7 @@ namespace InfiniteVariantTool.GUI
 
         public override void FileAction(string inputFilename, string outputFilename)
         {
-            LuaBundle bundle = LuaBundle.Unpack(inputFilename, Game.HaloInfinite);
+            LuaBundle bundle = LuaBundle.Load(inputFilename);
             byte[] packed = bundle.Pack();
             File.WriteAllBytes(outputFilename, packed);
         }

@@ -30,8 +30,8 @@
                 <MenuItem Header="Disabled variants" IsCheckable="True" IsChecked="{Binding VariantViewModel.ShowDisabledVariants}"/>
             </MenuItem>
             <MenuItem Header="Tools">
-                <MenuItem Header="Unpack cache file..." Command="{Binding OpenUnpackCacheFileWindowCommand}"/>
-                <MenuItem Header="Pack cache file..." Command="{Binding OpenPackCacheFileWindowCommand}"/>
+                <MenuItem Header="Unpack bond file..." Command="{Binding OpenUnpackCacheFileWindowCommand}"/>
+                <MenuItem Header="Pack bond file..." Command="{Binding OpenPackCacheFileWindowCommand}"/>
                 <Separator />
                 <MenuItem Header="Unpack Lua bundle..." Command="{Binding OpenUnpackLuaBundleWindowCommand}"/>
                 <MenuItem Header="Pack Lua bundle..." Command="{Binding OpenPackLuaBundleWindowCommand}"/>
