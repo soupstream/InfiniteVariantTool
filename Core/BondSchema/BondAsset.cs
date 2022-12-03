@@ -22,7 +22,7 @@ namespace InfiniteVariantTool.Core.BondSchema
         [Bond.Id(4)]
         public Files_ Files { get; set; }
         [Bond.Id(5)]
-        public List<string> Contributors { get; set; }
+        public HashSet<string> Contributors { get; set; }
         [Bond.Id(6)]
         public int AssetHome { get; set; }
         [Bond.Id(7)]
@@ -33,6 +33,12 @@ namespace InfiniteVariantTool.Core.BondSchema
         public int CloneBehavior { get; set; }
         [Bond.Id(10)]
         public int Order { get; set; }
+        [Bond.Id(11), Bond.Type(typeof(Bond.Tag.nullable<Date>))]
+        public Date? PublishDate { get; set; }
+        [Bond.Id(12)]
+        public uint VersionNumber { get; set; }
+        [Bond.Id(13)]
+        public string Admin { get; set; }
 
         public BondAsset()
         {
@@ -43,6 +49,7 @@ namespace InfiniteVariantTool.Core.BondSchema
             Files = new();
             Contributors = new();
             AssetStats = new();
+            Admin = "";
         }
 
         // copy constructor
@@ -59,6 +66,9 @@ namespace InfiniteVariantTool.Core.BondSchema
             InspectionResult = other.InspectionResult;
             CloneBehavior = other.CloneBehavior;
             Order = other.Order;
+            if (other.PublishDate != null) PublishDate = new(other.PublishDate);
+            VersionNumber = other.VersionNumber;
+            Admin = other.Admin;
         }
 
         [Bond.Schema]
@@ -123,6 +133,23 @@ namespace InfiniteVariantTool.Core.BondSchema
                 ParentAssetCount = other.ParentAssetCount;
                 AverageRating = other.AverageRating;
                 NumberOfRatings = other.NumberOfRatings;
+            }
+        }
+
+        [Bond.Schema]
+        public class Date
+        {
+            [Bond.Id(0)]
+            public string ISO8601Date { get; set; }
+
+            public Date()
+            {
+                ISO8601Date = "";
+            }
+
+            public Date(Date other)
+            {
+                ISO8601Date = other.ISO8601Date;
             }
         }
 
