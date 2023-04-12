@@ -78,7 +78,23 @@ namespace InfiniteVariantTool.Core
 
             if (getFiles)
             {
-                // add debug source if not already present
+                // filter out unneeded files
+                IEnumerable<string> fileRelativePaths = variant.Files.FileRelativePaths
+                    .Where(path => !Language.Languages.Any(lang => path.EndsWith($".{lang.ShortCode}")))
+                    .Where(path => path.EndsWith($"_{language.ShortCode}.bin") || !Language.Languages.Any(lang => path.EndsWith($"_{lang.ShortCode}.bin")))
+                    .Where(path => !path.EndsWith("_guid.txt"));
+
+                // download files
+                foreach (string relativePath in fileRelativePaths)
+                {
+                    ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
+                    {
+                        { "path", variant.Files.PrefixEndpoint.Path + relativePath },
+                    });
+                    variantAsset.Files[relativePath] = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
+                }
+
+                // download debug source if not already present
                 if (type == VariantType.EngineGameVariant)
                 {
                     string? debugScriptSourcePath = variant.Files.FileRelativePaths.Where(path => path.EndsWith("_guid.txt")).FirstOrDefault();
@@ -87,24 +103,53 @@ namespace InfiniteVariantTool.Core
                         debugScriptSourcePath = debugScriptSourcePath[..^"_guid.txt".Length] + FileExtension.Bin.Value + FileExtension.DebugScriptSource.Value;
                         if (!variant.Files.FileRelativePaths.Contains(debugScriptSourcePath))
                         {
-                            variant.Files.FileRelativePaths.Add(debugScriptSourcePath);
+                            byte[]? debugScriptSource = null;
+
+                            // try downloading from primary cache endpoint
+                            ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
+                            {
+                                { "path", variant.Files.PrefixEndpoint.Path + debugScriptSourcePath },
+                            });
+                            try
+                            {
+                                debugScriptSource = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
+                            }
+                            catch (HttpRequestException ex)
+                            {
+                                if (ex.StatusCode != HttpStatusCode.NotFound)
+                                {
+                                    throw;
+                                }
+                            }
+
+                            // try downloading from offline cache endpoint
+                            if (debugScriptSource == null && PrimaryCache != OfflineCache)
+                            {
+                                fileApiCall = OfflineCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
+                                {
+                                    { "path", variant.Files.PrefixEndpoint.Path + debugScriptSourcePath },
+                                });
+                                try
+                                {
+                                    debugScriptSource = await OfflineCache.GetFile(fileApiCall, MimeType.OctetStream);
+                                }
+                                catch (HttpRequestException ex)
+                                {
+                                    if (ex.StatusCode != HttpStatusCode.NotFound)
+                                    {
+                                        throw;
+                                    }
+                                }
+                            }
+
+                            // add debug script source to variant
+                            if (debugScriptSource != null)
+                            {
+                                variantAsset.Files[debugScriptSourcePath] = debugScriptSource;
+                                variant.Files.FileRelativePaths.Add(debugScriptSourcePath);
+                            }
                         }
                     }
-                }
-
-                // filter out unneeded files
-                IEnumerable<string> fileRelativePaths = variant.Files.FileRelativePaths
-                    .Where(path => !Language.Languages.Any(lang => path.EndsWith($".{lang.ShortCode}")))
-                    .Where(path => path.EndsWith($"_{language.ShortCode}.bin") || !Language.Languages.Any(lang => path.EndsWith($"_{lang.ShortCode}.bin")))
-                    .Where(path => !path.EndsWith("_guid.txt"));
-
-                foreach (string relativePath in fileRelativePaths)
-                {
-                    ApiCall fileApiCall = PrimaryCache.Api.Call(variant.Files.PrefixEndpoint.AuthorityId, new()
-                    {
-                        { "path", variant.Files.PrefixEndpoint.Path + relativePath },
-                    });
-                    variantAsset.Files[relativePath] = await PrimaryCache.GetFile(fileApiCall, MimeType.OctetStream);
                 }
             }
 

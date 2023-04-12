@@ -15,6 +15,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace InfiniteVariantTool.Core.Cache
@@ -94,6 +95,18 @@ namespace InfiniteVariantTool.Core.Cache
             {
                 CacheMap = SchemaSerializer.DeserializeBond<CacheMap>(await File.ReadAllBytesAsync(cacheMapPath));
                 Language = Language.TryFromCode(CacheMap.Language);
+                if (gameManifestEndpointId == "HIUGC_Discovery_GetManifestByBuildGuid" && !parameters.ContainsKey("buildGuid"))
+                {
+                    foreach (var entry in CacheMap.Entries)
+                    {
+                        var matches = Regex.Matches(entry.Value.Metadata.Url, ".*/manifests/guids/([a-zA-Z0-9]*)/game$");
+                        if (matches.Count > 0)
+                        {
+                            parameters["buildGuid"] = matches[0].Groups[1].Value;
+                            break;
+                        }
+                    }
+                }
             }
             else
             {
@@ -151,16 +164,17 @@ namespace InfiniteVariantTool.Core.Cache
             }
         }
 
-        public static async Task<CacheManager> LoadOnlineCache(string gameDir, string buildNumber)
+        public static async Task<CacheManager> LoadOnlineCache(string gameDir, string buildNumber, string buildGuid)
         {
             CacheManager cache = new(Path.Combine(gameDir, "disk_cache", "webcache"));
             await cache.LoadManifests(
                 "https://settings.svc.halowaypoint.com/settings/hipc/e2a0a7c6-6efe-42af-9283-c2ab73250c48",
-                "HIUGC_Discovery_GetManifestByBuild",
+                "HIUGC_Discovery_GetManifestByBuildGuid",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new()
                 {
-                    { "buildNumber", buildNumber }
+                    { "buildNumber", buildNumber },
+                    { "buildGuid", buildGuid },
                 });
             return cache;
         }
@@ -178,14 +192,14 @@ namespace InfiniteVariantTool.Core.Cache
 
         public static async Task<CacheManager> LoadOfflineCache(string gameDir, Language language, string buildNumber)
         {
-            CacheManager cache = new(Path.Combine(gameDir, "package", "pc", "{0}", "other"))
+            CacheManager cache = new(Path.Combine(gameDir, "package", "pc", language.Code, "other"))
             {
                 localized = true,
                 Language = language,
             };
             await cache.LoadManifests(
-                "https://settings-intone.test.svc.halowaypoint.com/settings/hipc/e2a0a7c6-6efe-42af-9283-c2ab73250c48",
-                "HIUGC_Discovery_GetManifestByBuild",
+                "https://settings-intone.test.svc.halowaypoint.com/settings/hi343ds/edec35d0-7c91-475c-816c-58a1373f26ab",
+                "HIUGC_Discovery_GetManifestByBuildGuid",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new()
                 {
@@ -209,12 +223,18 @@ namespace InfiniteVariantTool.Core.Cache
 
         public static async Task<CacheGroup> LoadAllCaches(string gameDir, string buildNumber, Func<Language> languagePicker)
         {
-            CacheManager onlineCache = await LoadOnlineCache(gameDir, buildNumber);
+            // load offline cache first to get build GUID, then reload later with correct language if not English
+            CacheManager offlineCache = await LoadOfflineCache(gameDir, Language.En, buildNumber);
+            string buildGuid = offlineCache.GameManifest.CustomData.BuildGuid.ToString().Replace("-", "");
+            CacheManager onlineCache = await LoadOnlineCache(gameDir, buildNumber, buildGuid);
             CacheManager lanCache = await LoadLanCache(gameDir, buildNumber);
             Language language = onlineCache.Language ?? lanCache.Language ?? languagePicker();
             onlineCache.Language ??= language;
             lanCache.Language ??= language;
-            CacheManager offlineCache = await LoadOfflineCache(gameDir, language, buildNumber);
+            if (language != Language.En)
+            {
+                offlineCache = await LoadOfflineCache(gameDir, language, buildNumber);
+            }
             return new CacheGroup(onlineCache, offlineCache, lanCache);
         }
 
