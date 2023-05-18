@@ -14,14 +14,14 @@ namespace InfiniteVariantTool.Core
 {
     public class UrlHasher
     {
-        public static ulong? HashUrl(string url)
+        public static ulong HashUrl(string url)
         {
             return Hash(GetDataToHash(new Uri(url)));
         }
 
-        public static ulong HashUrl(string path, string query, ApiManifest.Endpoint endpoint, ApiManifest.Authority authority)
+        public static ulong HashUrl(string path, string query, ApiManifest.Endpoint endpoint, ApiManifest.Authority authority, bool forceGeneric = false)
         {
-            return Hash(GetDataToHash(path, query, endpoint, authority));
+            return Hash(GetDataToHash(path, query, endpoint, authority, forceGeneric));
         }
 
         // FNV-1a
@@ -54,11 +54,11 @@ namespace InfiniteVariantTool.Core
 
         private static List<byte[]> GetDataToHash(Uri uri, ApiManifest.Endpoint endpoint, ApiManifest.Authority authority)
         {
-            return GetDataToHash(uri.AbsolutePath, uri.Query, endpoint, authority);
+            return GetDataToHash(uri.AbsolutePath, uri.Query, endpoint, authority, false);
         }
-        private static List<byte[]> GetDataToHash(string path, string query, ApiManifest.Endpoint endpoint, ApiManifest.Authority authority)
+        private static List<byte[]> GetDataToHash(string path, string query, ApiManifest.Endpoint endpoint, ApiManifest.Authority authority, bool forceGeneric)
         {
-            if (authority.AuthenticationMethods.Contains(0))
+            if (!forceGeneric && authority.AuthenticationMethods.Contains(0))
             {
                 return new List<byte[]>()
                 {

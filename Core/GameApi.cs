@@ -82,7 +82,19 @@ namespace InfiniteVariantTool.Core
 
         public ApiCall Call(string endpointId, Dictionary<string, string> parameters)
         {
-            return new ApiCall(EndpointMap[endpointId], parameters);
+            ApiCall apiCall = new(EndpointMap[endpointId], parameters);
+
+            if (endpointId == "iUgcFiles" && parameters.TryGetValue("path", out var path))
+            {
+                if (path.EndsWith(".png", StringComparison.InvariantCultureIgnoreCase)
+                    || path.EndsWith(".jpg", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // special case: image urls are hashed like generic urls
+                    apiCall.GenericHash = true;
+                }
+            }
+
+            return apiCall;
         }
 
         public ApiCall? CallUrl(string url)
@@ -115,7 +127,7 @@ namespace InfiniteVariantTool.Core
                             }
                         }
 
-                        return new ApiCall(endpoint, parameters);
+                        return Call(endpoint.Endpoint.EndpointId, parameters);
                     }
                 }
             }
@@ -187,10 +199,12 @@ namespace InfiniteVariantTool.Core
     {
         public ApiEndpoint ApiEndpoint { get; }
         public Dictionary<string, string> Parameters { get; }
+        public bool GenericHash { get; set; }
         public ApiCall(ApiEndpoint endpoint, Dictionary<string, string> parameters)
         {
             ApiEndpoint = endpoint;
             Parameters = parameters;
+            GenericHash = false;
         }
 
         public ulong Hash
@@ -199,7 +213,7 @@ namespace InfiniteVariantTool.Core
             {
                 string path = ApplyPath();
                 string query = ApplyQuery().TrimStart('?');
-                return UrlHasher.HashUrl(path, query, ApiEndpoint.Endpoint, ApiEndpoint.Authority);
+                return UrlHasher.HashUrl(path, query, ApiEndpoint.Endpoint, ApiEndpoint.Authority, GenericHash);
             }
         }
 

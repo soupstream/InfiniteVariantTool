@@ -32,6 +32,14 @@ namespace InfiniteVariantTool.Tests
         }
 
         [TestMethod]
+        public void TestImageBlobUrl()
+        {
+            string url = "https://blobs-infiniteugc.svc.halowaypoint.com/ugcstorage/ugcgamevariant/8d6e16cd-7e95-4166-92fd-d280163b7ab7/6ce17bcf-6af5-4d26-9181-9583ed35af56/images/thumbnail.png";
+            ulong hash = caches.Online.Api.CallUrl(url)!.Hash;
+            Assert.AreEqual(hash, 6434440846576808363U);
+        }
+
+        [TestMethod]
         public void TestDiscoveryUrl()
         {
             string url = "https://discovery-infiniteugc-intone.test.svc.halowaypoint.com/hi/engineGameVariants/bbe3163a-8eb1-4611-8b62-c132e91118fc/versions/66cae36b-d42d-48c8-a455-aeac6dedb893";
