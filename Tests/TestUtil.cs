@@ -78,9 +78,9 @@ namespace InfiniteVariantTool.Tests
             }
         }
 
-        public static string GetBuildNumber()
+        public static async Task<string> GetBuildNumber()
         {
-            return FileUtil.GetBuildNumber(UserSettings.Instance.GameDirectory);
+            return await FileUtil.GetBuildNumber(UserSettings.Instance.GameDirectory);
         }
     }
 

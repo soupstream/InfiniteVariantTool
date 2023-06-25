@@ -45,7 +45,7 @@ namespace InfiniteVariantTool.Core
         public static async Task<VariantManager> Load(Func<Language> languagePicker)
         {
             string gameDir = UserSettings.Instance.GameDirectory;
-            string buildNumber = FileUtil.GetBuildNumber(gameDir);
+            string buildNumber = await FileUtil.GetBuildNumber(gameDir);
             return await Load(UserSettings.Instance.GameDirectory, UserSettings.Instance.VariantDirectory, buildNumber, languagePicker);
         }
 

@@ -91,11 +91,17 @@ namespace InfiniteVariantTool.Core.Cache
 
         private async Task LoadManifests(string apiManifestUrl, string gameManifestEndpointId, string customsManifestEndpointId, Dictionary<string, string> parameters)
         {
+            if (localized && Language != null)
+            {
+                cacheMapPath = String.Format(cacheMapPath, Language.Code);
+            }
             if (File.Exists(cacheMapPath))
             {
                 CacheMap = SchemaSerializer.DeserializeBond<CacheMap>(await File.ReadAllBytesAsync(cacheMapPath));
                 Language = Language.TryFromCode(CacheMap.Language);
-                if (gameManifestEndpointId == "HIUGC_Discovery_GetManifestByBuildGuid" && !parameters.ContainsKey("buildGuid"))
+
+                // if build guid is needed, find it in cachemap
+                if (parameters.TryGetValue("buildGuid", out var buildGuid) && buildGuid == "")
                 {
                     foreach (var entry in CacheMap.Entries)
                     {
@@ -168,7 +174,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             CacheManager cache = new(Path.Combine(gameDir, "disk_cache", "webcache"));
             await cache.LoadManifests(
-                "https://settings.svc.halowaypoint.com/settings/hipc/e2a0a7c6-6efe-42af-9283-c2ab73250c48",
+                "https://settings.svc.halowaypoint.com/settings/hipc/2b3d52f6-0ed1-4d50-ba8a-254c4c77bba2",
                 "HIUGC_Discovery_GetManifestByBuildGuid",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new()
@@ -183,7 +189,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             CacheManager cache = new(Path.Combine(gameDir, "server_disk_cache", "webcache"));
             await cache.LoadManifests(
-                "https://settings.svc.halowaypoint.com/settings/hipcxolocalds/6858ba34-18a8-4030-84b8-1df01ff8ad34",
+                "https://settings.svc.halowaypoint.com/settings/hipcxolocalds/5f0d32ed-4458-46a2-8336-2968459eb826",
                 "HIUGC_Discovery_GetManifestForLocalDs",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new());
@@ -192,18 +198,19 @@ namespace InfiniteVariantTool.Core.Cache
 
         public static async Task<CacheManager> LoadOfflineCache(string gameDir, Language language, string buildNumber)
         {
-            CacheManager cache = new(Path.Combine(gameDir, "package", "pc", language.Code, "other"))
+            CacheManager cache = new(Path.Combine(gameDir, "package", "pc", "{0}", "other"))
             {
                 localized = true,
                 Language = language,
             };
             await cache.LoadManifests(
-                "https://settings-intone.test.svc.halowaypoint.com/settings/hi343ds/edec35d0-7c91-475c-816c-58a1373f26ab",
+                "https://settings-intone.test.svc.halowaypoint.com/settings/hi343ds/0ae7d2c7-4c03-4283-bfbf-b0012f677ace",
                 "HIUGC_Discovery_GetManifestByBuildGuid",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new()
                 {
-                    { "buildNumber", buildNumber }
+                    { "buildNumber", buildNumber },
+                    { "buildGuid", "" }
                 });
             return cache;
         }
@@ -217,7 +224,7 @@ namespace InfiniteVariantTool.Core.Cache
         public static async Task<CacheGroup> LoadAllCaches(Func<Language> languagePicker)
         {
             string gameDir = UserSettings.Instance.GameDirectory;
-            string buildNumber = FileUtil.GetBuildNumber(gameDir);
+            string buildNumber = await FileUtil.GetBuildNumber(gameDir);
             return await LoadAllCaches(gameDir, buildNumber, languagePicker);
         }
 
@@ -225,7 +232,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             // load offline cache first to get build GUID, then reload later with correct language if not English
             CacheManager offlineCache = await LoadOfflineCache(gameDir, Language.En, buildNumber);
-            string buildGuid = offlineCache.GameManifest.CustomData.BuildGuid.ToString().Replace("-", "");
+            string buildGuid = offlineCache.GameManifestApiCall.Parameters["buildGuid"];
             CacheManager onlineCache = await LoadOnlineCache(gameDir, buildNumber, buildGuid);
             CacheManager lanCache = await LoadLanCache(gameDir, buildNumber);
             Language language = onlineCache.Language ?? lanCache.Language ?? languagePicker();
@@ -414,36 +421,48 @@ namespace InfiniteVariantTool.Core.Cache
                 return;
             }
 
+            // get or create cache map entry
+            ulong hash = apiCall.Hash;
+            CacheMap.Entry entry;
+            if (CacheMap.Entries.ContainsKey(hash))
+            {
+                entry = CacheMap.Entries[hash];
+                entry.Metadata.Url = apiCall.Url;
+                entry.Metadata.Timestamp = 0;
+            }
+            else
+            {
+                var fileTime = DateTime.UtcNow.ToFileTime();
+                entry = new()
+                {
+                    CreateTime = fileTime,
+                    AccessTime = fileTime,
+                    WriteTime = fileTime,
+                    Metadata = new()
+                    {
+                        Headers = new()
+                        {
+                            { "Content-Type", mimeType.Value }
+                        },
+                        Url = apiCall.Url
+                    },
+                    Size = 0
+                };
+                CacheMap.Entries[hash] = entry;
+            }
+
             // write file with metadata
             CacheFile cacheFile = new()
             {
-                Metadata = new()
-                {
-                    Headers = new()
-                    {
-                        { "Content-Type", mimeType.Value }
-                    },
-                    Url = apiCall.Url
-                },
+                Metadata = entry.Metadata,
                 Data = (sbyte[])(Array)data
             };
-            ulong hash = apiCall.Hash;
+
             string filePath = Path.Combine(Directory, hash.ToString());
             System.IO.Directory.CreateDirectory(Directory);
             byte[] cacheData = SchemaSerializer.SerializeBond(cacheFile);
             await File.WriteAllBytesAsync(filePath, cacheData);
-
-            // add entry to cache map
-            var fileTime = DateTime.UtcNow.ToFileTime();
-            CacheMap.Entry entry = new()
-            {
-                CreateTime = fileTime,
-                AccessTime = fileTime,
-                WriteTime = fileTime,
-                Metadata = cacheFile.Metadata,
-                Size = (ulong)cacheData.LongLength
-            };
-            CacheMap.Entries[hash] = entry;
+            entry.Size = (ulong)cacheData.LongLength;
         }
 
         public async Task StoreBondFile(object src, ApiCall apiCall)

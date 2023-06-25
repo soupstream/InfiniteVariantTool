@@ -19,15 +19,12 @@ namespace InfiniteVariantTool.Core
             EndpointMap = new();
             Authority? openDiscoveryAuthority = null;
 
-            // missing from offline manifest
-            if (apiManifest.Authorities.TryGetValue("settings", out var settingsAuthority) && (settingsAuthority?.Hostname?.Contains("intone") ?? false))
+            // some endpoints need flight id query string
+            foreach (string endpointName in new string[] { "HIUGC_Discovery_GetTagsInfo", "HIUGC_Discovery_GetCustomGameManifest" })
             {
-                foreach (string endpointName in new string[] { "HIUGC_Discovery_GetTagsInfo", "HIUGC_Discovery_GetCustomGameManifest" })
+                if (apiManifest.Endpoints.TryGetValue(endpointName, out var flightEndpoint) && flightEndpoint.QueryString == "")
                 {
-                    if (apiManifest.Endpoints.TryGetValue(endpointName, out var flightEndpoint) && flightEndpoint.QueryString == "")
-                    {
-                        flightEndpoint.QueryString = "?flight={flightId}";
-                    }
+                    flightEndpoint.QueryString = "?flight={flightId}";
                 }
             }
 

@@ -90,11 +90,25 @@ namespace InfiniteVariantTool.Core.Utils
             return filename;
         }
 
-        public static string GetBuildNumber(string gameDir)
+        public static async Task<string> GetBuildNumber(string gameDir)
         {
             FileVersionInfo exeInfo = FileVersionInfo.GetVersionInfo(Path.Combine(gameDir, Constants.GameExeName));
-            string version = exeInfo.ProductVersion ?? throw new Exception("Game version not found");
-            return version[..^2];   // remove ".0" from end
+            string? version = exeInfo.ProductVersion;
+            if (version != null)
+            {
+                return version[..^2];   // remove ".0" from end
+            }
+            else
+            {
+                // if exe doesn't have version info, parse it from version.txt
+                string versionFilePath = Path.Combine(gameDir, "version.txt");
+                int shortVersionLength = 6;
+                using FileStream stream = File.OpenRead(versionFilePath);
+                byte[] buffer = new byte[shortVersionLength];
+                await stream.ReadAsync(buffer.AsMemory(0, shortVersionLength));
+                string shortVersion = Encoding.ASCII.GetString(buffer);
+                return "6.100" + shortVersion[..2] + ".1" + shortVersion[2..];
+            }
         }
 
         public static string ReadResource(string name)
