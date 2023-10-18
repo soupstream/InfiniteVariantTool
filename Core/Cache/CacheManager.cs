@@ -174,7 +174,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             CacheManager cache = new(Path.Combine(gameDir, "disk_cache", "webcache"));
             await cache.LoadManifests(
-                "https://settings.svc.halowaypoint.com/settings/hipc/2b3d52f6-0ed1-4d50-ba8a-254c4c77bba2",
+                "https://settings.svc.halowaypoint.com/settings/hipc/ad24e661-65bc-4389-9677-0e29c9bf002a",
                 "HIUGC_Discovery_GetManifestByBuildGuid",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new()
@@ -189,7 +189,7 @@ namespace InfiniteVariantTool.Core.Cache
         {
             CacheManager cache = new(Path.Combine(gameDir, "server_disk_cache", "webcache"));
             await cache.LoadManifests(
-                "https://settings.svc.halowaypoint.com/settings/hipcxolocalds/5f0d32ed-4458-46a2-8336-2968459eb826",
+                "https://settings.svc.halowaypoint.com/settings/hipcxolocalds/a28a7b30-f2bd-470c-905b-921b1ef61964",
                 "HIUGC_Discovery_GetManifestForLocalDs",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new());
@@ -204,7 +204,7 @@ namespace InfiniteVariantTool.Core.Cache
                 Language = language,
             };
             await cache.LoadManifests(
-                "https://settings-intone.test.svc.halowaypoint.com/settings/hi343ds/0ae7d2c7-4c03-4283-bfbf-b0012f677ace",
+                "https://settings-intone.test.svc.halowaypoint.com/settings/hi343ds/130843b1-8727-4c57-8d2a-2ca14e41fa29",
                 "HIUGC_Discovery_GetManifestByBuildGuid",
                 "HIUGC_Discovery_GetCustomGameManifest",
                 new()

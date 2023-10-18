@@ -41,6 +41,8 @@ namespace InfiniteVariantTool.Core.BondSchema
         [Bond.Schema]
         public class CustomData_
         {
+            [Bond.Id(0)]
+            public int Intent { get; set; }
         }
 
         #endregion
